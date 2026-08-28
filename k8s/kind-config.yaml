@@ -1,0 +1,10 @@
+# kind: map NodePorts to localhost (required for CI and local kind clusters)
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - containerPort: 30433
+        hostPort: 30433
+      - containerPort: 30456
+        hostPort: 30456

@@ -55,11 +55,15 @@ def run(
 def _wait(timeout: int = 180) -> None:
     cfg = load_config()
     deadline = time.time() + timeout
+    last_err: Exception | None = None
     while time.time() < deadline:
         try:
             httpx.get(f"{cfg.aws_endpoint}/_localstack/health", timeout=2).raise_for_status()
             ping(cfg.database_url)
             return
-        except Exception:
+        except Exception as exc:
+            last_err = exc
             time.sleep(2)
-    raise TimeoutError("postgres or localstack not ready")
+    hint = " (on kind: create cluster with k8s/kind-config.yaml)"
+    detail = f": {last_err}" if last_err else ""
+    raise TimeoutError(f"postgres or localstack not ready{detail}{hint}")

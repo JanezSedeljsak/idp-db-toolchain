@@ -24,6 +24,12 @@ uv run python manage.py list
 
 Services expose **NodePort** `30433` (postgres) and `30456` (localstack) — no port-forward.
 
+With **kind**, create the cluster using the port mappings config:
+
+```bash
+kind create cluster --name idp-db-backupper --config k8s/kind-config.yaml
+```
+
 ## Dev
 
 ```bash

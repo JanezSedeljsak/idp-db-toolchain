@@ -32,6 +32,7 @@ jobs:
       - uses: helm/kind-action@v1
         with:
           cluster_name: idp-db-backupper
+          config: k8s/kind-config.yaml
       - run: uv run python manage.py setup -y --force --seed
       - run: |
           uv run python manage.py daily
