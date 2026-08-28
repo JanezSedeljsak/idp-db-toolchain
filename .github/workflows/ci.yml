@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - run: uv sync --dev --locked
+      - run: uv run ruff check . && uv run ruff format --check .
+      - run: uv run pytest -q
+
+  integration:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - run: uv sync --dev --locked
+      - uses: helm/kind-action@v1
+        with:
+          cluster_name: idp-db-backupper
+      - run: uv run python manage.py setup -y --force --seed
+      - run: |
+          uv run python manage.py daily
+          uv run python manage.py list
+      - if: always()
+        run: uv run python manage.py k8s-down
