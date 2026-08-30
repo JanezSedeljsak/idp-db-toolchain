@@ -61,6 +61,14 @@ jobs:
         run: |
           export IMAGE_REGISTRY="$(echo "${IMAGE_REGISTRY}" | tr '[:upper:]' '[:lower:]')"
           ./dev.sh ci-build
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: idp-db-backupper:local
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
       - run: docker save -o image.tar idp-db-backupper:local
       - uses: actions/upload-artifact@v4
         with:

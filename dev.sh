@@ -170,7 +170,15 @@ EOF
 
 rollout_deploy() {
   kubectl set image "deployment/backupper" "backupper=${IMAGE}" -n "$DEPLOY_NAMESPACE"
-  kubectl rollout status "deployment/backupper" -n "$DEPLOY_NAMESPACE" --timeout=300s
+
+  if ! kubectl rollout status "deployment/backupper" -n "$DEPLOY_NAMESPACE" --timeout=300s; then
+    echo "rollout of ${IMAGE} failed to become ready — rolling back" >&2
+    kubectl rollout undo "deployment/backupper" -n "$DEPLOY_NAMESPACE"
+    kubectl rollout status "deployment/backupper" -n "$DEPLOY_NAMESPACE" --timeout=180s
+    echo "rolled back deployment/backupper in ${DEPLOY_NAMESPACE} to the previous revision" >&2
+    return 1
+  fi
+
   kubectl annotate deployment/backupper -n "$DEPLOY_NAMESPACE" \
     "backupper.dev/deployed-at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     "backupper.dev/image=${IMAGE}" \

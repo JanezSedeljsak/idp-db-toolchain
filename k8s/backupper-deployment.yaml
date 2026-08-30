@@ -17,6 +17,7 @@ spec:
       labels:
         app: backupper
     spec:
+      terminationGracePeriodSeconds: 120
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000

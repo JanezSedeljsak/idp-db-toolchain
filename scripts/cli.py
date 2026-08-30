@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import logging
 import re
+import signal
+import threading
 import time
 from datetime import datetime
 from typing import Annotated
@@ -15,7 +17,7 @@ from scripts import backup, db_registry, health, k8s, metrics, notify, s3, setup
 from scripts import retention as retention_mod
 from scripts import seed as seed_data
 from scripts.config import Config, cfg_for_db, load_config
-from scripts.database import session
+from scripts.database import dispose_engines, session
 from scripts.databases import resolve_cfg, resolve_targets
 from scripts.jobs import job_run, list_jobs
 from scripts.logging_config import setup_logging
@@ -404,8 +406,25 @@ def daily() -> None:
         log.info("daily done %s: s3://%s/%s", db_id, cfg.s3_bucket, key)
 
 
+_shutdown = threading.Event()
+
+
+def _handle_shutdown_signal(signum: int, _frame: object) -> None:
+    log.info(
+        "received signal %s — finishing any in-flight job, then stopping scheduler",
+        signal.Signals(signum).name,
+    )
+    _shutdown.set()
+
+
 def _sleep_until(when: datetime) -> None:
-    time.sleep(max(0, (when - datetime.now()).total_seconds()))
+    """Sleep in short slices so a shutdown signal is noticed within ~1s instead of
+    waiting out the full interval until the next cron tick."""
+    while not _shutdown.is_set():
+        remaining = (when - datetime.now()).total_seconds()
+        if remaining <= 0:
+            return
+        time.sleep(min(remaining, 1.0))
 
 
 @app.command()
@@ -417,7 +436,10 @@ def schedule(
     backup_schedule = cron or cfg.backup_cron
     retention_schedule = retention_cron or cfg.retention_cron
     failures = 0
-    serve_metrics(cfg, port=cfg.metrics_port)
+    _shutdown.clear()
+    signal.signal(signal.SIGTERM, _handle_shutdown_signal)
+    signal.signal(signal.SIGINT, _handle_shutdown_signal)
+    server = serve_metrics(cfg, port=cfg.metrics_port)
     log.info(
         "scheduler: backup=%s retention=%s databases=%s metrics :%s",
         backup_schedule,
@@ -430,37 +452,47 @@ def schedule(
     retention_iter = croniter(retention_schedule, now)
     next_backup = backup_iter.get_next(datetime)
     next_retention = retention_iter.get_next(datetime)
-    while True:
-        if next_backup <= next_retention:
-            _sleep_until(next_backup)
-            try:
-                daily()
-                failures = 0
-            except Exception as exc:
-                failures += 1
-                log.exception(
-                    "scheduled backup failed (%s/%s)",
-                    failures,
-                    cfg.max_schedule_failures,
-                )
-                notify.notify_failure(cfg, f"scheduled backup failed: {exc}")
-                if failures >= cfg.max_schedule_failures:
-                    raise SystemExit(1) from exc
-            next_backup = backup_iter.get_next(datetime)
-        else:
-            _sleep_until(next_retention)
-            try:
-                run_retention_cycle(cfg)
-                failures = 0
-            except Exception as exc:
-                failures += 1
-                log.exception(
-                    "scheduled retention failed (%s/%s)", failures, cfg.max_schedule_failures
-                )
-                notify.notify_failure(cfg, f"scheduled retention failed: {exc}")
-                if failures >= cfg.max_schedule_failures:
-                    raise SystemExit(1) from exc
-            next_retention = retention_iter.get_next(datetime)
+    try:
+        while not _shutdown.is_set():
+            if next_backup <= next_retention:
+                _sleep_until(next_backup)
+                if _shutdown.is_set():
+                    break
+                try:
+                    daily()
+                    failures = 0
+                except Exception as exc:
+                    failures += 1
+                    log.exception(
+                        "scheduled backup failed (%s/%s)",
+                        failures,
+                        cfg.max_schedule_failures,
+                    )
+                    notify.notify_failure(cfg, f"scheduled backup failed: {exc}")
+                    if failures >= cfg.max_schedule_failures:
+                        raise SystemExit(1) from exc
+                next_backup = backup_iter.get_next(datetime)
+            else:
+                _sleep_until(next_retention)
+                if _shutdown.is_set():
+                    break
+                try:
+                    run_retention_cycle(cfg)
+                    failures = 0
+                except Exception as exc:
+                    failures += 1
+                    log.exception(
+                        "scheduled retention failed (%s/%s)", failures, cfg.max_schedule_failures
+                    )
+                    notify.notify_failure(cfg, f"scheduled retention failed: {exc}")
+                    if failures >= cfg.max_schedule_failures:
+                        raise SystemExit(1) from exc
+                next_retention = retention_iter.get_next(datetime)
+    finally:
+        log.info("scheduler stopped, closing metrics server")
+        server.shutdown()
+        server.server_close()
+        dispose_engines()
 
 
 @app.command()
