@@ -78,9 +78,7 @@ def test_restore_without_verify_streams_from_s3(monkeypatch: pytest.MonkeyPatch)
 
     monkeypatch.setattr(
         "scripts.backup._pipe_restore",
-        lambda database_url, restore_cfg, restore_key: calls.append(
-            (database_url, restore_key)
-        ),
+        lambda database_url, restore_cfg, restore_key: calls.append((database_url, restore_key)),
     )
 
     backup.restore(cfg, key, verify=False)
