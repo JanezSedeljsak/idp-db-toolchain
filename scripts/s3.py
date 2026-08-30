@@ -20,14 +20,16 @@ _KEY_RE = re.compile(
 
 
 def _client(cfg: Config):
-    return boto3.client(
-        "s3",
-        region_name=cfg.aws_region,
-        endpoint_url=cfg.aws_endpoint,
-        aws_access_key_id=cfg.aws_access_key_id,
-        aws_secret_access_key=cfg.aws_secret_access_key,
-        config=_RETRY,
-    )
+    kwargs: dict = {
+        "region_name": cfg.aws_region,
+        "config": _RETRY,
+    }
+    if cfg.aws_endpoint:
+        kwargs["endpoint_url"] = cfg.aws_endpoint
+    if cfg.aws_access_key_id and cfg.aws_secret_access_key:
+        kwargs["aws_access_key_id"] = cfg.aws_access_key_id
+        kwargs["aws_secret_access_key"] = cfg.aws_secret_access_key
+    return boto3.client("s3", **kwargs)
 
 
 def ensure_bucket(cfg: Config) -> None:

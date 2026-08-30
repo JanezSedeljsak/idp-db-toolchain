@@ -6,7 +6,7 @@ import pytest
 
 from scripts import backup, pg_tools
 from scripts import seed as seed_data
-from scripts.config import cfg_for_db, load_config
+from scripts.config import Config, cfg_for_db, load_config
 from scripts.database import session
 from scripts.dev_schema import apply_dev_schema
 
@@ -39,17 +39,30 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 
 
 @pytest.fixture(scope="module")
-def live_cfg():
+def live_cfg() -> Config:
     return load_config()
 
 
 @pytest.fixture(scope="module")
-def seeded_shop(live_cfg):
+def seeded_databases(live_cfg: Config):
     apply_dev_schema()
-    shop = cfg_for_db(live_cfg, "shop")
-    with session(shop.database_url) as s:
-        seed_data.run(s)
-    yield shop
+    targets = []
+    for target in live_cfg.databases:
+        db_cfg = cfg_for_db(live_cfg, target.id)
+        with session(db_cfg.database_url) as s:
+            seed_data.run(
+                s,
+                counts=seed_data.INTEGRATION_COUNTS,
+                rng_seed=seed_data.INTEGRATION_RNG_SEED,
+                prefix=target.id,
+            )
+        targets.append(db_cfg)
+    yield targets
+
+
+@pytest.fixture(scope="module")
+def seeded_shop(seeded_databases):
+    return seeded_databases[0]
 
 
 @pytest.fixture(scope="module")

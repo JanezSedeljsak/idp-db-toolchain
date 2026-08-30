@@ -9,22 +9,33 @@ from sqlalchemy.orm import Session
 from scripts.models import AuditLog, Order, User
 
 COUNTS = {"users": 50, "orders": 200, "audit": 100}
+INTEGRATION_COUNTS = {"users": 5, "orders": 10, "audit": 5}
+INTEGRATION_RNG_SEED = 42
 
 
-def run(session: Session, job: str | None = None, count: int = 50) -> None:
+def run(
+    session: Session,
+    job: str | None = None,
+    count: int = 50,
+    *,
+    counts: dict[str, int] | None = None,
+    rng_seed: int | None = None,
+    prefix: str = "default",
+) -> None:
+    profile = counts or COUNTS
+    rng = random.Random(rng_seed if rng_seed is not None else time.time())
     if job:
-        _job(session, job, count)
+        _job(session, job, count, rng=rng, prefix=prefix)
         return
-    _job(session, "users", COUNTS["users"])
-    _job(session, "orders", COUNTS["orders"])
-    _job(session, "audit", COUNTS["audit"])
+    _job(session, "users", profile["users"], rng=rng, prefix=prefix)
+    _job(session, "orders", profile["orders"], rng=rng, prefix=prefix)
+    _job(session, "audit", profile["audit"], rng=rng, prefix=prefix)
 
 
-def _job(session: Session, job: str, count: int) -> None:
-    rng = random.Random(time.time())
+def _job(session: Session, job: str, count: int, *, rng: random.Random, prefix: str) -> None:
     if job == "users":
         for i in range(count):
-            email = f"user{int(time.time())}_{i}@example.com"
+            email = f"{prefix}_user_{i}@example.com"
             name = f"User {rng.randint(0, 9999)}"
             session.execute(
                 insert(User)
@@ -56,3 +67,19 @@ def _job(session: Session, job: str, count: int) -> None:
             )
     else:
         raise ValueError(f"unknown job: {job}")
+
+
+def seed_config(cfg, *, profile: str = "default") -> None:
+    from scripts.config import cfg_for_db
+    from scripts.database import session
+
+    if profile == "integration":
+        counts = INTEGRATION_COUNTS
+        rng_seed = INTEGRATION_RNG_SEED
+    else:
+        counts = COUNTS
+        rng_seed = None
+
+    for target in cfg.databases:
+        with session(target.database_url) as s:
+            run(s, counts=counts, rng_seed=rng_seed, prefix=target.id)

@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: backupper
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: backupper
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U backupper]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  backupper:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      BACKUPPER_CONFIG: /etc/backupper/backupper.toml
+      AWS_REGION: ${AWS_REGION}
+      S3_BUCKET: ${S3_BUCKET}
+      APP_ENV: demo
+    volumes:
+      - ./backupper.toml:/etc/backupper/backupper.toml:ro
+      - backupper_data:/var/lib/backupper
+    command: ["python", "manage.py", "schedule"]
+
+volumes:
+  postgres_data:
+  backupper_data:
