@@ -11,7 +11,7 @@ from db.session import get_engine
 
 
 def _schema_files() -> list[Path]:
-    root = Path(__file__).resolve().parents[1] / "k8s"
+    root = Path(__file__).resolve().parents[2] / "k8s"
     return [root / "dev-schema.sql", root / "anonymize-schema.sql"]
 
 
