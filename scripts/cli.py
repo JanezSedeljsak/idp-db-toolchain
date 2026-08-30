@@ -11,7 +11,8 @@ import typer
 from croniter import croniter
 
 from scripts import anonymize as anonymize_mod
-from scripts import backup, k8s, metrics, notify, retention, s3, setup, status
+from scripts import backup, db_registry, health, k8s, metrics, notify, s3, setup, status
+from scripts import retention as retention_mod
 from scripts import seed as seed_data
 from scripts.config import Config, cfg_for_db, load_config
 from scripts.database import session
@@ -21,6 +22,8 @@ from scripts.logging_config import setup_logging
 from scripts.metrics_server import serve_metrics
 
 app = typer.Typer(help="Multi-database PostgreSQL backup platform", no_args_is_help=True)
+db_app = typer.Typer(help="Add or remove registered databases", no_args_is_help=True)
+app.add_typer(db_app, name="databases")
 log = logging.getLogger(__name__)
 
 _DURATION_RE = re.compile(r"^(\d+)([dhm])$")
@@ -84,11 +87,86 @@ def k8s_down() -> None:
     k8s.down()
 
 
-@app.command()
-def databases() -> None:
+@db_app.command("list")
+def databases_list() -> None:
     cfg = load_config()
     for target in cfg.databases:
         log.info("%s\t%s", target.id, target.database_url)
+
+
+@db_app.command("add")
+def databases_add(
+    db_id: Annotated[str | None, typer.Option("--id", help="Short name used in S3 paths")] = None,
+    url: Annotated[str | None, typer.Option("--url", help="Postgres connection URL")] = None,
+    yes: Annotated[bool, typer.Option("-y", "--yes", help="Skip confirmation")] = False,
+    apply_schema: Annotated[
+        bool, typer.Option("--apply-schema", help="Apply dev anonymize schema to this database")
+    ] = False,
+) -> None:
+    if not url:
+        url = typer.prompt("Database URL")
+    assert url is not None
+    log.info("testing connection...")
+    try:
+        db_registry.validate_connection(url)
+    except (ValueError, ConnectionError) as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    log.info("connection ok")
+    suggested = db_registry.suggest_id(url)
+    if not db_id:
+        db_id = typer.prompt("Database id", default=suggested)
+    assert db_id is not None
+    _confirm(f"register {db_id} -> {url}", yes=yes)
+    with job_run("databases-add", database=db_id):
+        target = db_registry.add_database(db_id, url, apply_schema=apply_schema)
+    log.info("registered %s", target.id)
+
+
+@db_app.command("remove")
+def databases_remove(
+    db_id: Annotated[str | None, typer.Option("--id", help="Database to unregister")] = None,
+    yes: Annotated[bool, typer.Option("-y", "--yes", help="Skip confirmation")] = False,
+    prune: Annotated[
+        bool | None,
+        typer.Option("--prune/--no-prune", help="Delete all S3 backups for this database"),
+    ] = None,
+) -> None:
+    cfg = load_config()
+    if not db_id:
+        if len(cfg.databases) == 1:
+            raise typer.BadParameter("only one database registered — pass --id explicitly")
+        log.info("registered databases:")
+        for target in cfg.databases:
+            log.info("  %s", target.id)
+        db_id = typer.prompt("Database id to remove")
+    assert db_id is not None
+    cfg.require_database(db_id)
+    backup_count = len(s3.list_backups(cfg, db_id=db_id))
+    if prune is None:
+        if backup_count:
+            prune = confirm_bool(
+                f"also delete {backup_count} backup(s) for {db_id} from s3://{cfg.s3_bucket}",
+                default=False,
+            )
+        else:
+            prune = False
+    _confirm(f"remove {db_id} from backupper.toml", yes=yes)
+    with job_run("databases-remove", database=db_id, prune=prune):
+        deleted = db_registry.remove_database(db_id, prune_backups=bool(prune), cfg=cfg)
+    log.info("removed %s from config", db_id)
+    if deleted:
+        log.info("pruned %s backup object(s) from S3", len(deleted))
+
+
+def confirm_bool(prompt: str, *, default: bool = False) -> bool:
+    hint = "Y/n" if default else "y/N"
+    answer = typer.prompt(f"{prompt} [{hint}]", default="y" if default else "n")
+    return answer.strip().lower() in ("y", "yes")
+
+
+@db_app.callback()
+def databases_group() -> None:
+    """Manage databases registered in backupper.toml."""
 
 
 @app.command()
@@ -211,48 +289,45 @@ def prune_cmd(
 
 
 @app.command()
-def retention_cmd(
+def retention(
     db: Annotated[str | None, typer.Option("--db")] = None,
     yes: Annotated[bool, typer.Option("-y", "--yes")] = False,
-    force: Annotated[
-        bool, typer.Option("--force", help="Run even if not the 1st of month")
-    ] = False,
 ) -> None:
-    cfg = load_config()
-    if not force and not retention.should_run_scheduled_retention():
-        log.info("retention only runs on the 1st of each month (use --force to override)")
-        return
+    execute_retention(load_config(), db=db, confirm=not yes)
+
+
+def execute_retention(
+    cfg: Config,
+    *,
+    db: str | None = None,
+    confirm: bool = True,
+) -> None:
     targets = resolve_targets(cfg, db)
     planned: list[tuple[str, list[str]]] = []
     for target in targets:
         db_cfg = cfg_for_db(cfg, target.id)
-        month = retention.retention_target_month()
-        in_month = [
-            obj["Key"]
-            for obj in s3.list_backups(db_cfg)
-            if (day := s3.backup_date_from_key(obj["Key"])) is not None
-            and retention.month_bounds(month)[0] <= day <= retention.month_bounds(month)[1]
-        ]
-        cutoff = retention.retention_expiry_cutoff()
-        expired = [
-            obj["Key"]
-            for obj in s3.list_backups(db_cfg)
-            if (day := s3.backup_date_from_key(obj["Key"])) is not None and day < cutoff
-        ]
-        collapse = in_month[1:] if len(in_month) > 1 else []
-        keys = collapse + expired
-        if keys:
-            planned.append((target.id, keys))
+        plan = retention_mod.plan_retention(db_cfg)
+        if plan.to_delete:
+            planned.append((target.id, plan.to_delete))
     if not planned:
         log.info("nothing to delete")
         return
     for db_id, keys in planned:
         for key in keys:
             log.info("would delete %s %s", db_id, key)
-    _confirm(f"delete {sum(len(k) for _, k in planned)} backup(s)", yes=yes)
+    if confirm:
+        _confirm(f"delete {sum(len(k) for _, k in planned)} backup(s)", yes=False)
     with job_run("retention"):
         for target in targets:
-            result = retention.apply_retention(cfg, target.id)
+            result = retention_mod.apply_retention(cfg, target.id)
+            if result.deleted:
+                log.info(
+                    "%s retention: weekly=%s monthly=%s expired=%s",
+                    target.id,
+                    len(result.weekly_collapsed),
+                    len(result.monthly_collapsed),
+                    len(result.expired),
+                )
             for key in result.deleted:
                 log.info("deleted %s %s", target.id, key)
 
@@ -309,18 +384,11 @@ def run_observability_cycle(cfg: Config) -> None:
 
 
 def run_retention_cycle(cfg: Config) -> None:
-    if not retention.should_run_scheduled_retention():
-        return
-    with job_run("retention"):
-        for target in cfg.databases:
-            result = retention.apply_retention(cfg, target.id)
-            if result.deleted:
-                log.info(
-                    "%s retention: collapsed=%s expired=%s",
-                    target.id,
-                    len(result.collapsed),
-                    len(result.expired),
-                )
+    try:
+        execute_retention(cfg, confirm=False)
+    except Exception as exc:
+        notify.notify_failure(cfg, f"retention failed: {exc}")
+        raise
 
 
 @app.command()
@@ -329,7 +397,6 @@ def daily() -> None:
     try:
         keys = run_backup_cycle(cfg)
         run_observability_cycle(cfg)
-        run_retention_cycle(cfg)
     except Exception as exc:
         notify.notify_failure(cfg, f"daily backup failed: {exc}")
         raise
@@ -337,29 +404,63 @@ def daily() -> None:
         log.info("daily done %s: s3://%s/%s", db_id, cfg.s3_bucket, key)
 
 
+def _sleep_until(when: datetime) -> None:
+    time.sleep(max(0, (when - datetime.now()).total_seconds()))
+
+
 @app.command()
-def schedule(cron: Annotated[str, typer.Option()] = "0 2 * * *") -> None:
+def schedule(
+    cron: Annotated[str | None, typer.Option(envvar="BACKUP_CRON")] = None,
+    retention_cron: Annotated[str | None, typer.Option(envvar="RETENTION_CRON")] = None,
+) -> None:
     cfg = load_config()
+    backup_schedule = cron or cfg.backup_cron
+    retention_schedule = retention_cron or cfg.retention_cron
     failures = 0
     serve_metrics(cfg, port=cfg.metrics_port)
     log.info(
-        "scheduler: %s databases=%s metrics :%s",
-        cron,
+        "scheduler: backup=%s retention=%s databases=%s metrics :%s",
+        backup_schedule,
+        retention_schedule,
         ",".join(d.id for d in cfg.databases),
         cfg.metrics_port,
     )
+    now = datetime.now()
+    backup_iter = croniter(backup_schedule, now)
+    retention_iter = croniter(retention_schedule, now)
+    next_backup = backup_iter.get_next(datetime)
+    next_retention = retention_iter.get_next(datetime)
     while True:
-        nxt = croniter(cron, datetime.now()).get_next(datetime)
-        time.sleep(max(0, (nxt - datetime.now()).total_seconds()))
-        try:
-            daily()
-            failures = 0
-        except Exception as exc:
-            failures += 1
-            log.exception("scheduled backup failed (%s/%s)", failures, cfg.max_schedule_failures)
-            notify.notify_failure(cfg, f"scheduled backup failed: {exc}")
-            if failures >= cfg.max_schedule_failures:
-                raise SystemExit(1) from exc
+        if next_backup <= next_retention:
+            _sleep_until(next_backup)
+            try:
+                daily()
+                failures = 0
+            except Exception as exc:
+                failures += 1
+                log.exception(
+                    "scheduled backup failed (%s/%s)",
+                    failures,
+                    cfg.max_schedule_failures,
+                )
+                notify.notify_failure(cfg, f"scheduled backup failed: {exc}")
+                if failures >= cfg.max_schedule_failures:
+                    raise SystemExit(1) from exc
+            next_backup = backup_iter.get_next(datetime)
+        else:
+            _sleep_until(next_retention)
+            try:
+                run_retention_cycle(cfg)
+                failures = 0
+            except Exception as exc:
+                failures += 1
+                log.exception(
+                    "scheduled retention failed (%s/%s)", failures, cfg.max_schedule_failures
+                )
+                notify.notify_failure(cfg, f"scheduled retention failed: {exc}")
+                if failures >= cfg.max_schedule_failures:
+                    raise SystemExit(1) from exc
+            next_retention = retention_iter.get_next(datetime)
 
 
 @app.command()
@@ -377,6 +478,22 @@ def jobs(
             record.error,
             json.dumps(record.details) if record.details else None,
         )
+
+
+@app.command()
+def health_cmd(
+    readiness: Annotated[
+        bool, typer.Option("--readiness/--liveness", help="Check dependencies or process only")
+    ] = True,
+) -> None:
+    cfg = load_config()
+    report = health.readiness(cfg) if readiness else health.liveness()
+    for check in report.checks:
+        detail = f" ({check.detail})" if check.detail else ""
+        state = "ok" if check.ok else "fail"
+        log.info("%s %s%s", state, check.name, detail)
+    if not report.ok:
+        raise typer.Exit(code=1)
 
 
 @app.command()

@@ -9,6 +9,7 @@ resources:
   - postgres-init.yaml
   - postgres.yaml
   - localstack.yaml
+  - backupper-config.yaml
   - backupper-secret.yaml
   - backupper-deployment.yaml
   - backupper-service.yaml

@@ -9,9 +9,18 @@ from pathlib import Path
 import httpx
 
 from scripts import k8s, s3, seed
-from scripts.config import DEFAULTS, load_config, load_env, write_env
+from scripts.config import ensure_dev_config, load_config
 from scripts.database import ping, session
 from scripts.dev_schema import apply_dev_schema
+
+
+def _ensure_env_file() -> None:
+    env_path = Path.cwd() / ".env"
+    example = Path.cwd() / ".env.example"
+    if env_path.is_file() or not example.is_file():
+        return
+    shutil.copy2(example, env_path)
+    print(f"wrote {env_path} from .env.example")
 
 
 def run(
@@ -20,27 +29,31 @@ def run(
     if not shutil.which("kubectl"):
         raise RuntimeError("kubectl not found")
 
-    env_path = Path.cwd() / ".env"
-    if env_path.exists() and not force:
-        raise RuntimeError(f"{env_path} exists — use --force")
+    config_path = Path.cwd() / "backupper.toml"
+    if config_path.exists() and not force:
+        raise RuntimeError(f"{config_path} exists — use --force to re-copy defaults")
 
-    values = dict(DEFAULTS)
+    if config_path.exists() and force:
+        backup_path = config_path.with_suffix(".toml.bak")
+        shutil.copy2(config_path, backup_path)
+        print(f"backed up existing backupper.toml -> {backup_path}")
+
+    if not config_path.exists() or force:
+        ensure_dev_config(force=force)
+        print(f"wrote {config_path}")
+
+    _ensure_env_file()
+
     if not yes:
-        print("press Enter for defaults")
-        bucket = input(f"S3 bucket [{values['S3_BUCKET']}]: ").strip()
-        if bucket:
-            values["S3_BUCKET"] = bucket
+        cfg = load_config()
+        bucket = input(f"S3 bucket [{cfg.s3_bucket}]: ").strip()
+        if bucket and bucket != cfg.s3_bucket:
+            text = config_path.read_text()
+            config_path.write_text(
+                text.replace(f'bucket = "{cfg.s3_bucket}"', f'bucket = "{bucket}"')
+            )
         if not do_seed:
             do_seed = input("Seed sample data? (y/N): ").strip().lower() in ("y", "yes")
-
-    if env_path.exists() and force:
-        backup_path = env_path.with_suffix(".env.bak")
-        shutil.copy2(env_path, backup_path)
-        print(f"backed up existing .env -> {backup_path}")
-
-    write_env(values)
-    load_env()
-    print(f"wrote {env_path}")
 
     if skip_k8s:
         print("skipped k8s — run: uv run python manage.py k8s-up")

@@ -5,6 +5,7 @@ namespace: idp-db-backupper
 
 resources:
   - ../namespace.yaml
+  - ../backupper-config.yaml
   - ../backupper-deployment.yaml
   - ../backupper-service.yaml
 

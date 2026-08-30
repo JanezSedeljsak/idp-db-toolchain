@@ -1,12 +1,27 @@
 from pathlib import Path
 
-from scripts.config import load_env, write_env
+import pytest
+
+from scripts.config import ensure_dev_config, load_config, load_env
 
 
-def test_env_file(tmp_path: Path, monkeypatch) -> None:
+def test_toml_defaults(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
-    write_env({"S3_BUCKET": "test-bucket", "DATABASE_URL": "postgres://localhost/db"})
-    load_env()
-    import os
+    ensure_dev_config()
+    cfg = load_config()
+    assert cfg.s3_bucket == "db-backups"
+    assert cfg.backup_cron == "0 2 * * *"
+    assert cfg.retention_cron == "0 3 1 * *"
+    assert len(cfg.databases) == 3
+    assert cfg.databases[0].id == "shop"
 
-    assert os.environ["S3_BUCKET"] == "test-bucket"
+
+def test_env_overrides_toml(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    ensure_dev_config()
+    env_path = tmp_path / ".env"
+    env_path.write_text("S3_BUCKET=override-bucket\n")
+    load_env()
+    cfg = load_config()
+    assert cfg.s3_bucket == "override-bucket"
+    assert cfg.backup_cron == "0 2 * * *"

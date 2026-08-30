@@ -12,6 +12,7 @@ dependencies = [
     "zstandard>=0.23.0",
     "httpx>=0.27.0",
     "croniter>=2.0.0",
+    "tomli-w>=1.2.0",
 ]
 
 [project.scripts]
@@ -23,6 +24,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["scripts"]
+include = ["backupper.toml"]
 
 [dependency-groups]
 dev = [

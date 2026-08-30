@@ -124,6 +124,9 @@ wait_backupper_ready() {
 }
 
 ensure_host_dotenv() {
+  if [[ ! -f backupper.toml ]]; then
+    uv run python -c "from scripts.config import ensure_dev_config; ensure_dev_config()"
+  fi
   if [[ ! -f .env ]]; then
     cp .env.example .env
   fi

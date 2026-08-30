@@ -38,6 +38,10 @@ def ensure_bucket(cfg: Config) -> None:
         client.create_bucket(Bucket=cfg.s3_bucket)
 
 
+def check_bucket(cfg: Config) -> None:
+    _client(cfg).head_bucket(Bucket=cfg.s3_bucket)
+
+
 def backup_key(cfg: Config) -> str:
     ts = datetime.now(UTC)
     p = cfg.s3_prefix.rstrip("/")
@@ -156,6 +160,13 @@ def list_all_backups(cfg: Config) -> list[dict]:
 
 def delete_object(cfg: Config, key: str) -> None:
     _client(cfg).delete_object(Bucket=cfg.s3_bucket, Key=key)
+
+
+def delete_database_backups(cfg: Config, db_id: str) -> list[str]:
+    keys = [obj["Key"] for obj in list_backups(cfg, db_id=db_id)]
+    for key in keys:
+        delete_object(cfg, key)
+    return keys
 
 
 def prune_backups(cfg: Config, older_than: timedelta, *, db_id: str | None = None) -> list[str]:

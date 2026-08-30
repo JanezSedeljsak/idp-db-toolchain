@@ -24,17 +24,37 @@ A single **IDP service** that connects to many production Postgres instances (or
 
 ## Configure databases
 
-Set `DATABASES` as JSON (all backups land in the same `S3_BUCKET`):
+Primary config lives in **`backupper.toml`** (schedules, databases, S3 settings, metrics). Load order:
 
-```json
-[
-  {"id": "shop", "url": "postgres://user:pass@host:5432/shop?sslmode=require"},
-  {"id": "billing", "url": "postgres://user:pass@host:5432/billing?sslmode=require"},
-  {"id": "analytics", "url": "postgres://user:pass@host:5432/analytics?sslmode=require"}
-]
+1. `backupper.toml` — from `BACKUPPER_CONFIG`, `./backupper.toml`, or the bundled default
+2. `.env` — optional secrets and overrides (`AWS_*`, `S3_BUCKET`, `DATABASES`, …)
+
+Dev defaults are in the committed `backupper.toml`. Copy and edit for other environments, or mount a ConfigMap in k8s (`k8s/backupper-config.yaml`).
+
+```toml
+app_env = "dev"
+
+[[databases]]
+id = "shop"
+url = "postgres://user:pass@host:5432/shop?sslmode=require"
+
+[schedule]
+backup = "0 2 * * *"
+retention = "0 3 1 * *"
+
+[s3]
+bucket = "db-backups"
+prefix = "backups"
+region = "us-east-1"
 ```
 
-Local demo defaults to **shop**, **billing**, and **analytics** on the kind Postgres NodePort.
+`.env` is for secrets only in prod:
+
+```bash
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+# optional: DATABASES='[{"id":"shop","url":"..."}]'
+```
 
 S3 key layout: `backups/{db_id}/{YYYY-MM-DD}/backup-{HHMMSS}.dump.zst`
 
@@ -42,25 +62,36 @@ S3 key layout: `backups/{db_id}/{YYYY-MM-DD}/backup-{HHMMSS}.dump.zst`
 
 | Command | What |
 |---------|------|
-| `databases` | list configured targets |
+| `databases list` | list registered targets |
+| `databases add` | wizard: register a new database in `backupper.toml` |
+| `databases remove` | wizard: unregister (+ optional S3 backup prune) |
 | `backup [--db shop]` | backup one or all databases |
 | `export --db shop --to-db <url>` | pg_dump prod → restore elsewhere |
 | `restore --db shop --key …` | restore from S3 |
 | `anonymize --from-db shop --to-db <url>` | export + apply registry anonymization |
 | `retention [--db shop]` | monthly cleanup (see below) |
 | `prune --older-than 30d` | **manual** delete — always confirms |
-| `daily` | backup all + metrics + retention (on 1st of month) |
-| `schedule` | cron loop + Prometheus `:8080/metrics` |
+| `daily` | backup all + metrics |
+| `health` | readiness check (all DBs + S3) |
+| `schedule` | backup cron + retention cron + HTTP health on `:8080` |
 
 ## Retention policy
 
-Conservative by design — nothing deleted without the retention job:
+Retention runs on its **own cron** (default `0 3 1 * *` — 03:00 on the 1st of each month), separate from daily backups. Configure with `RETENTION_CRON`.
 
-- **Last ~2 months**: all daily backups kept
-- **On the 1st of each month**: process backups from **2 months ago** — if multiple exist that month, keep the newest, delete the rest
-- **Older than 12 months**: all backups deleted
+| Age | What we keep |
+|-----|----------------|
+| **Current month** | All daily backups |
+| **Last month** | One backup per ISO week |
+| **Older than 2 months** | One backup per calendar month (prefer last week of that month) |
+| **Older than 12 months** | Deleted |
 
-Run manually: `manage.py retention --force` (dry-run preview still asks for confirmation before delete).
+`schedule` runs backup and retention independently — cron expressions live in `backupper.toml` under `[schedule]`. Manual `retention` still previews deletes and asks for confirmation (use `-y` to skip the prompt).
+
+```bash
+manage.py retention          # preview + confirm
+manage.py schedule           # uses [schedule] from backupper.toml
+```
 
 ## Anonymization
 
@@ -76,6 +107,24 @@ Exports with `--from-db` only anonymize columns listed in the registry for that 
 - Per-DB status: `.backupper-status-{db_id}.json`
 - Prometheus: `backupper_*{database="shop"}` — import `k8s/grafana-dashboard.json`
 
+### Health checks
+
+HTTP on the metrics port (default `8080`):
+
+| Path | Use |
+|------|-----|
+| `/health` | Liveness — process is up |
+| `/ready` | Readiness — all configured databases + S3 bucket |
+| `/health/full` | JSON detail (same checks as `/ready`) |
+| `/metrics` | Prometheus scrape |
+
+```bash
+manage.py health              # readiness (all DBs + S3)
+manage.py health --liveness   # process only
+```
+
+k8s uses `startupProbe` + `livenessProbe` → `/health`, `readinessProbe` → `/ready`.
+
 ## Platform deploy
 
 ```bash
@@ -84,7 +133,7 @@ export KUBECONFIG=~/.kube/platform
 PUBLISH_TARGET=remote ./dev.sh ci-publish-deploy
 ```
 
-Create `backupper-env` secret with `DATABASES` JSON + AWS credentials. Workload manifests: `k8s/deploy/`.
+Create `backupper-env` secret (AWS keys) and `backupper-config` ConfigMap (or mount your `backupper.toml`). Workload manifests: `k8s/deploy/`.
 
 ## Dev
 
@@ -95,6 +144,55 @@ Create `backupper-env` secret with `DATABASES` JSON + AWS credentials. Workload 
 ```
 
 Postgres `:30433`, LocalStack `:30456`. Three demo databases seeded via wizard.
+
+## Terraform (HCL)
+
+The `terraform/` directory is **local dev only**. The `.tf` files are written in **HCL** (HashiCorp Configuration Language) — a small declarative language for describing infrastructure.
+
+What it does here:
+
+- Creates the **LocalStack S3 bucket** (`db-backups`) and enables versioning
+- Creates a minimal **IAM user + policy** for put/get/list/delete on that bucket
+- Points the AWS provider at LocalStack (`localhost:30456`), not real AWS
+
+Why it exists:
+
+- Optional bootstrap if you want S3/IAM created outside the app (`manage.py setup` also calls `ensure_bucket` directly)
+- Documents the **intended S3 permissions** for production IAM policies (copy the policy shape into your cloud account)
+- Keeps cloud-shaped config in version control without touching the backupper runtime
+
+It is **not** part of the k8s deploy path. Do not `terraform apply` against a real AWS account without changing provider, credentials, and remote state. Production buckets and IAM are owned by the platform team.
+
+```bash
+cd terraform
+terraform init
+terraform apply   # LocalStack only
+```
+
+## Backup format & Postgres versions
+
+Backups use **`pg_dump -Fc`** (PostgreSQL custom archive), then **zstd** compression. Restore uses **`pg_restore`** on the target cluster.
+
+### Is plain SQL (ANSI-style text) worth it?
+
+There is no true Postgres-agnostic “ANSI dump”. In practice you choose between:
+
+| Format | Tooling | Portability | Size / speed |
+|--------|---------|-------------|--------------|
+| **Custom `-Fc`** (current) | `pg_restore` | Good across versions when you use **`pg_restore` from the target (newer) major** | Best |
+| **Plain SQL `-Fp`** | `psql -f` | Human-readable; still Postgres-specific DDL/DML; slowest, largest | Worst |
+
+**Custom format is the right default** for this IDP: smaller over the wire, faster, and PostgreSQL explicitly supports logical dumps across major versions (e.g. 12 → 19) as long as you restore with a client **at least as new** as the target server.
+
+Plain SQL is useful as an **escape hatch** for odd upgrades, manual inspection, or importing into non-Postgres tools — not as the daily backup format. If we add it later, it would be a separate export mode (`export --format plain`), not a replacement for scheduled backups.
+
+### Upgrade path (pg12 → pg19)
+
+1. **Logical dump/restore** (what this tool does): `pg_dump` on old → `pg_restore` / `psql` on new. Supported for many major jumps; test on a copy first.
+2. **`pg_upgrade`**: in-place cluster upgrade, faster for huge DBs, not what backupper orchestrates.
+3. **Avoid** the hand-rolled SQL dumper in `scripts/db.py` — it is for small integration tests only and will mishandle real types.
+
+Operational rule: run **`pg_dump` with the source major’s client**, **`pg_restore` with the target major’s client** (our Docker image should ship both or match the oldest source you still restore from).
 
 ## Future ideas
 
