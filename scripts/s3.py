@@ -42,6 +42,11 @@ def check_bucket(cfg: Config) -> None:
     _client(cfg).head_bucket(Bucket=cfg.s3_bucket)
 
 
+def check_reachable(cfg: Config) -> None:
+    """Verify the S3 API is reachable; the backup bucket may not exist yet."""
+    _client(cfg).list_buckets()
+
+
 def backup_key(cfg: Config) -> str:
     ts = datetime.now(UTC)
     p = cfg.s3_prefix.rstrip("/")

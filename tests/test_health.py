@@ -11,7 +11,7 @@ def test_liveness() -> None:
 
 def test_readiness_all_ok(monkeypatch) -> None:
     monkeypatch.setattr("scripts.health.ping", lambda _url: None)
-    monkeypatch.setattr("scripts.health.s3.check_bucket", lambda _cfg: None)
+    monkeypatch.setattr("scripts.health.s3.check_reachable", lambda _cfg: None)
 
     from scripts.config import Config, DatabaseTarget
 
@@ -46,7 +46,7 @@ def test_readiness_db_failure(monkeypatch) -> None:
         raise RuntimeError("connection refused")
 
     monkeypatch.setattr("scripts.health.ping", fail_ping)
-    monkeypatch.setattr("scripts.health.s3.check_bucket", lambda _cfg: None)
+    monkeypatch.setattr("scripts.health.s3.check_reachable", lambda _cfg: None)
 
     from scripts.config import Config, DatabaseTarget
 

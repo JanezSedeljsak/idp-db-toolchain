@@ -7,6 +7,9 @@ NS = "idp-db-backupper"
 IMAGE = "idp-db-backupper:local"
 KIND_CLUSTER = "idp-db-backupper"
 
+_INFRA_SELECTORS = ("app=postgres", "app=localstack")
+_WAIT_TIMEOUT = "300s"
+
 
 def build_image() -> None:
     subprocess.run(
@@ -23,11 +26,7 @@ def load_image(cluster: str = KIND_CLUSTER) -> None:
     )
 
 
-def up(*, build_image_first: bool = False) -> None:
-    if build_image_first:
-        build_image()
-        load_image()
-    subprocess.run(["kubectl", "apply", "-k", "k8s"], check=True)
+def _wait_ready(selector: str) -> None:
     subprocess.run(
         [
             "kubectl",
@@ -37,11 +36,20 @@ def up(*, build_image_first: bool = False) -> None:
             "--for=condition=ready",
             "pod",
             "-l",
-            "app.kubernetes.io/part-of=idp-db-backupper",
-            "--timeout=180s",
+            selector,
+            f"--timeout={_WAIT_TIMEOUT}",
         ],
         check=True,
     )
+
+
+def up(*, build_image_first: bool = False) -> None:
+    if build_image_first:
+        build_image()
+        load_image()
+    subprocess.run(["kubectl", "apply", "-k", "k8s"], check=True)
+    for selector in _INFRA_SELECTORS:
+        _wait_ready(selector)
 
 
 def down() -> None:

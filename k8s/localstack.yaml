@@ -14,9 +14,16 @@ spec:
       labels:
         app: localstack
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: localstack
           image: localstack/localstack:3.8
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           ports:
             - containerPort: 4566
           env:

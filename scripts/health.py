@@ -43,7 +43,7 @@ def readiness(cfg: Config) -> HealthReport:
         except Exception as exc:
             checks.append(HealthCheck(name=name, ok=False, detail=str(exc)))
     try:
-        s3.check_bucket(cfg)
+        s3.check_reachable(cfg)
         checks.append(HealthCheck(name="s3", ok=True, detail=cfg.s3_bucket))
     except Exception as exc:
         checks.append(HealthCheck(name="s3", ok=False, detail=str(exc)))

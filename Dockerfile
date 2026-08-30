@@ -23,6 +23,10 @@ COPY scripts ./scripts
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
+RUN useradd --create-home --uid 1000 --shell /usr/sbin/nologin backupper \
+    && chown -R backupper:backupper /app
+USER backupper
+
 ENV PATH="/app/.venv/bin:$PATH"
 
 ENTRYPOINT ["python", "manage.py"]

@@ -17,10 +17,22 @@ spec:
       labels:
         app: backupper
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: backupper
           image: idp-db-backupper:local
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           ports:
             - containerPort: 8080
               name: metrics
@@ -37,6 +49,8 @@ spec:
               readOnly: true
             - name: data
               mountPath: /var/lib/backupper
+            - name: tmp
+              mountPath: /tmp
           resources:
             requests:
               cpu: 50m
@@ -71,4 +85,6 @@ spec:
           configMap:
             name: backupper-config
         - name: data
+          emptyDir: {}
+        - name: tmp
           emptyDir: {}
