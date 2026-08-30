@@ -83,12 +83,9 @@ def _pg_restore_args(conn: dict[str, str], *, clean: bool = True) -> list[str]:
 
 
 def dump_to_file(database_url: str, path: str) -> None:
-    conn = parse_pg_url(database_url)
-    env = _conn_env(conn)
-    result = subprocess.run(_pg_dump_args(conn), env=env, capture_output=True, check=False)
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr.decode().strip() or "pg_dump failed")
-    Path(path).write_bytes(result.stdout)
+    with Path(path).open("wb") as fh, stream_dump(database_url) as chunks:
+        for chunk in chunks:
+            fh.write(chunk)
 
 
 def restore_from_file(database_url: str, path: str) -> None:

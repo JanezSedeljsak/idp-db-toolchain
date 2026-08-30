@@ -1,6 +1,6 @@
 # idp-db-backupper
 
-Production database platform for backups, exports, anonymized test copies, and observability. Connects to **external** Postgres in the cloud — schema and migrations live in the main application, not here.
+Multi-database PostgreSQL management platform: one k8s service, one S3 bucket, compressed backups for every database you register.
 
 ```bash
 ./dev.sh wizard
@@ -9,55 +9,74 @@ Production database platform for backups, exports, anonymized test copies, and o
 
 ## What this is
 
+A single **IDP service** that connects to many production Postgres instances (or many databases on one cluster), backs them all up to **one S3 bucket**, and gives you exports, anonymized copies, metrics, and retention — without touching schema migrations.
+
 | In scope | Out of scope |
 |----------|--------------|
-| Scheduled `pg_dump` → zstd → S3 | Alembic / schema migrations |
-| Restore, verify, prune backups | Mutating prod DB on deploy |
-| DB export / import (`export_to_target`) | Bundled Postgres in production |
-| Simple anonymization (swap user names/ids) | Heavy PII redaction pipelines |
-| Job run log (JSONL), DB metrics, slow queries | Application business logic |
-| Prometheus `/metrics` on port 8080 | |
+| Multi-DB backup → zstd → S3 (`backups/{db_id}/…`) | Alembic / schema migrations |
+| Scheduled backups for all registered databases | Mutating prod DB on deploy |
+| Export / import between databases | Bundled Postgres in production |
+| Postgres-driven anonymization registry | Heavy PII pipelines |
+| Monthly retention (safe, conservative) | Aggressive auto-delete |
+| Job log, metrics, slow queries, Grafana | Application business logic |
 
-**Publish / CI-CD only rolls out the workload image.** It never runs migrations, seeds, or restores against production.
+**Publish / CI-CD only rolls out the workload image** — no migrations, seeds, or restores on deploy.
+
+## Configure databases
+
+Set `DATABASES` as JSON (all backups land in the same `S3_BUCKET`):
+
+```json
+[
+  {"id": "shop", "url": "postgres://user:pass@host:5432/shop?sslmode=require"},
+  {"id": "billing", "url": "postgres://user:pass@host:5432/billing?sslmode=require"},
+  {"id": "analytics", "url": "postgres://user:pass@host:5432/analytics?sslmode=require"}
+]
+```
+
+Local demo defaults to **shop**, **billing**, and **analytics** on the kind Postgres NodePort.
+
+S3 key layout: `backups/{db_id}/{YYYY-MM-DD}/backup-{HHMMSS}.dump.zst`
 
 ## Commands
 
 | Command | What |
 |---------|------|
-| `setup` | `.env` + local k8s + dev schema + optional seed |
-| `k8s-up` / `k8s-down` | start / stop local cluster workloads |
-| `seed` | sample data (local dev only) |
-| `backup` | pg_dump + zstd + upload |
-| `restore --key` | download + pg_restore (with confirmation) |
-| `verify --key` | checksum-verify a backup |
-| `prune --older-than 30d` | delete old backups (with confirmation) |
-| `anonymize --key --out` | scrub a backup artifact |
-| `anonymize --from-db --to-db` | copy DB with swapped user names/ids |
-| `daily` | backup + metrics + slow-query capture |
-| `jobs` | show recent job runs from JSONL log |
-| `metrics` | snapshot DB size, connections, table estimates |
-| `list` | show backups in S3 |
-| `status` | last backup success/failure |
-| `schedule` | cron loop for `daily` + metrics HTTP server |
+| `databases` | list configured targets |
+| `backup [--db shop]` | backup one or all databases |
+| `export --db shop --to-db <url>` | pg_dump prod → restore elsewhere |
+| `restore --db shop --key …` | restore from S3 |
+| `anonymize --from-db shop --to-db <url>` | export + apply registry anonymization |
+| `retention [--db shop]` | monthly cleanup (see below) |
+| `prune --older-than 30d` | **manual** delete — always confirms |
+| `daily` | backup all + metrics + retention (on 1st of month) |
+| `schedule` | cron loop + Prometheus `:8080/metrics` |
 
-Local dev uses kind + bundled Postgres/LocalStack (`k8s/`). Production uses `k8s/deploy/` with platform-managed secrets and external DB/S3.
+## Retention policy
+
+Conservative by design — nothing deleted without the retention job:
+
+- **Last ~2 months**: all daily backups kept
+- **On the 1st of each month**: process backups from **2 months ago** — if multiple exist that month, keep the newest, delete the rest
+- **Older than 12 months**: all backups deleted
+
+Run manually: `manage.py retention --force` (dry-run preview still asks for confirmation before delete).
+
+## Anonymization
+
+Each database can register columns in `backupper.anonymize_columns`. Postgres functions `backupper.anonymize_text()` and `backupper.anonymize_integer()` transform values; foreign keys are left alone.
+
+Default registry (dev): `users.name`, `users.email`, `orders.amount_cents`.
+
+Exports with `--from-db` only anonymize columns listed in the registry for that database.
 
 ## Observability
 
-- **Job log**: `$BACKUPPER_DATA_DIR/.backupper-jobs.jsonl` — every backup, prune, anonymize, etc.
-- **Metrics snapshot**: `.backupper-metrics.json` (size, connections, table row estimates)
-- **Slow queries**: `.backupper-slow-queries.jsonl` from `pg_stat_activity` (+ `pg_stat_statements` when available)
-- **Prometheus**: scrape `http://backupper:8080/metrics` — import `k8s/grafana-dashboard.json`
-- **Status**: `.backupper-status.json` + optional `NOTIFY_WEBHOOK_URL` on failure
-
-Tune slow-query threshold with `SLOW_QUERY_MS` (default 5000).
+- Job log: `$BACKUPPER_DATA_DIR/.backupper-jobs.jsonl`
+- Per-DB status: `.backupper-status-{db_id}.json`
+- Prometheus: `backupper_*{database="shop"}` — import `k8s/grafana-dashboard.json`
 
 ## Platform deploy
-
-- CI builds and pushes `ghcr.io/<repo>:<sha>` on merges to `main`
-- Create `backupper-env` secret in the target namespace (see `k8s/backupper-secret.yaml`)
-- Manual **Publish** workflow: `kubectl apply -k k8s/deploy` → rolling image update → optional smoke `backup` Job
-- No database preparation runs on deploy
 
 ```bash
 export IMAGE=ghcr.io/your-org/idp-db-backupper:abc123
@@ -65,33 +84,21 @@ export KUBECONFIG=~/.kube/platform
 PUBLISH_TARGET=remote ./dev.sh ci-publish-deploy
 ```
 
+Create `backupper-env` secret with `DATABASES` JSON + AWS credentials. Workload manifests: `k8s/deploy/`.
+
 ## Dev
 
 ```bash
 ./dev.sh wizard
-./dev.sh lint
 ./dev.sh test
-./dev.sh test-integration   # export→import compare + backup roundtrip
-./dev.sh publish            # kind: full stack + rolling deploy
+./dev.sh test-integration
 ```
 
-Postgres and LocalStack expose NodePorts **30433** / **30456**. Dev schema is applied via `k8s/dev-schema.sql` (postgres init + `apply_dev_schema`).
-
-CI: `./dev.sh ci-lint` → `ci-build` → `ci-test` → `ci-integration` (on PR/main).
+Postgres `:30433`, LocalStack `:30456`. Three demo databases seeded via wizard.
 
 ## Future ideas
 
-- Backup verification reports stored in S3
-- Replication lag / standby health checks
-- Point-in-time recovery orchestration
+- Backup verification reports in S3
+- Replication lag / standby health per database
 - Scheduled anonymized exports to a staging bucket
-- Connection pool saturation alerts
-- Index bloat / vacuum stats panels in Grafana
-
-## Terraform
-
-`terraform/` is LocalStack-only for the dev S3 bucket. Not for real AWS accounts as-is.
-
-## Production safety
-
-Set `APP_ENV=prod` with real `DATABASE_URL` and AWS credentials. The app refuses dev defaults in prod mode.
+- Per-tenant retention overrides

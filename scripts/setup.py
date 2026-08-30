@@ -51,10 +51,11 @@ def run(
     _wait()
     cfg = load_config()
     s3.ensure_bucket(cfg)
-    apply_dev_schema(cfg.database_url)
+    apply_dev_schema()
     if do_seed:
-        with session(cfg.database_url) as s:
-            seed.run(s)
+        for target in cfg.databases:
+            with session(target.database_url) as s:
+                seed.run(s)
     print("setup done")
 
 

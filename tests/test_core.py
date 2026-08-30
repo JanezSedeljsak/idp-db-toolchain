@@ -1,10 +1,13 @@
+import json
 import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
+import zstandard as zstd
 
-from scripts import db
+from scripts import db, streaming
 
 
 def test_format_sql_value_datetime() -> None:
@@ -27,15 +30,39 @@ def test_split_sql() -> None:
 
 
 def test_zstd_roundtrip() -> None:
-    import zstandard as zstd
-
     raw = b"hello backup"
     assert zstd.ZstdDecompressor().decompress(zstd.ZstdCompressor().compress(raw)) == raw
+
+
+def test_compress_chunks_to_file_roundtrip(tmp_path: Path) -> None:
+    raw = b"x" * 200_000
+
+    def chunks():
+        for offset in range(0, len(raw), 4096):
+            yield raw[offset : offset + 4096]
+
+    archive = tmp_path / "backup.dump.zst"
+    size, digest = streaming.compress_chunks_to_file(chunks(), archive, level=3)
+    assert size == archive.stat().st_size
+    assert digest == streaming.hash_file(archive)
+    out = b"".join(streaming.iter_decompressed_file(archive))
+    assert out == raw
+
+
+def test_iter_reader() -> None:
+    reader = streaming.IterReader(iter([b"abc", b"def"]))
+    assert reader.read(2) == b"ab"
+    assert reader.read(4) == b"cdef"
+    assert reader.read() == b""
 
 
 def test_prod_guard_rejects_defaults(monkeypatch) -> None:
     from scripts.config import load_config
 
     monkeypatch.setenv("APP_ENV", "prod")
-    with pytest.raises(RuntimeError, match="dev default"):
+    monkeypatch.setenv(
+        "DATABASES",
+        json.dumps([{"id": "shop", "url": "postgres://backupper:backupper@localhost/shop"}]),
+    )
+    with pytest.raises(RuntimeError, match="dev"):
         load_config()
