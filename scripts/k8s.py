@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 
 NS = "idp-db-backupper"
 IMAGE = "idp-db-backupper:local"
 KIND_CLUSTER = "idp-db-backupper"
 
-_INFRA_SELECTORS = ("app=postgres", "app=localstack")
 _WAIT_TIMEOUT = "300s"
+_INFRA_SELECTORS = (
+    ("app=postgres", "600s"),
+    ("app=localstack", _WAIT_TIMEOUT),
+)
 
 
 def build_image() -> None:
@@ -26,21 +30,34 @@ def load_image(cluster: str = KIND_CLUSTER) -> None:
     )
 
 
-def _wait_ready(selector: str) -> None:
-    subprocess.run(
-        [
-            "kubectl",
-            "wait",
-            "-n",
-            NS,
-            "--for=condition=ready",
-            "pod",
-            "-l",
-            selector,
-            f"--timeout={_WAIT_TIMEOUT}",
-        ],
-        check=True,
-    )
+def _diagnose_wait_failure(selector: str) -> None:
+    for args in (
+        ["kubectl", "get", "pods", "-n", NS, "-l", selector, "-o", "wide"],
+        ["kubectl", "describe", "pods", "-n", NS, "-l", selector],
+    ):
+        subprocess.run(args, check=False)
+
+
+def _wait_ready(selector: str, *, timeout: str = _WAIT_TIMEOUT) -> None:
+    try:
+        subprocess.run(
+            [
+                "kubectl",
+                "wait",
+                "-n",
+                NS,
+                "--for=condition=ready",
+                "pod",
+                "-l",
+                selector,
+                f"--timeout={timeout}",
+            ],
+            check=True,
+        )
+    except subprocess.CalledProcessError:
+        print(f"kubectl wait timed out for selector {selector!r}", file=sys.stderr)
+        _diagnose_wait_failure(selector)
+        raise
 
 
 def up(*, build_image_first: bool = False) -> None:
@@ -48,8 +65,8 @@ def up(*, build_image_first: bool = False) -> None:
         build_image()
         load_image()
     subprocess.run(["kubectl", "apply", "-k", "k8s"], check=True)
-    for selector in _INFRA_SELECTORS:
-        _wait_ready(selector)
+    for selector, timeout in _INFRA_SELECTORS:
+        _wait_ready(selector, timeout=timeout)
 
 
 def down() -> None:

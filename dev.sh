@@ -365,11 +365,13 @@ ci_build() {
   docker_build
   docker tag "$IMAGE" idp-db-backupper:local
 
-  if [[ "${GITHUB_REF:-}" == "refs/heads/main" && -n "${IMAGE_REGISTRY:-}" ]]; then
-    REMOTE_IMAGE="$(echo "${IMAGE_REGISTRY}" | tr '[:upper:]' '[:lower:]'):${tag}"
-    docker tag "$IMAGE" "$REMOTE_IMAGE"
-    docker push "$REMOTE_IMAGE"
-    echo "pushed ${REMOTE_IMAGE}"
+  if [[ -n "${IMAGE_REGISTRY:-}" ]]; then
+    if [[ "${GITHUB_REF:-}" == "refs/heads/main" || "${GITHUB_EVENT_NAME:-}" == "workflow_dispatch" ]]; then
+      REMOTE_IMAGE="$(echo "${IMAGE_REGISTRY}" | tr '[:upper:]' '[:lower:]'):${tag}"
+      docker tag "$IMAGE" "$REMOTE_IMAGE"
+      docker push "$REMOTE_IMAGE"
+      echo "pushed ${REMOTE_IMAGE}"
+    fi
   fi
 }
 
@@ -384,7 +386,9 @@ ci_integration() {
   LOCKED=1 sync_deps
   if [[ "${SKIP_DOCKER_BUILD:-}" != "1" ]]; then
     docker_build
-    kind load docker-image "$IMAGE" --name "$KIND_CLUSTER"
+  fi
+  if kind_cluster_exists; then
+    kind load docker-image idp-db-backupper:local --name "$KIND_CLUSTER"
   fi
   uv run python manage.py setup -y --force --seed
   run_test_integration

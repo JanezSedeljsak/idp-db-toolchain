@@ -27,6 +27,7 @@ spec:
     spec:
       securityContext:
         fsGroup: 70
+        fsGroupChangePolicy: OnRootMismatch
         seccompProfile:
           type: RuntimeDefault
       containers:
@@ -36,8 +37,6 @@ spec:
             runAsNonRoot: true
             runAsUser: 70
             allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
           ports:
             - containerPort: 5432
           envFrom:
@@ -54,6 +53,12 @@ spec:
             exec:
               command: [pg_isready, -U, backupper]
             periodSeconds: 5
+            failureThreshold: 12
+          startupProbe:
+            exec:
+              command: [pg_isready, -U, backupper]
+            periodSeconds: 5
+            failureThreshold: 60
           livenessProbe:
             exec:
               command: [pg_isready, -U, backupper]
