@@ -34,6 +34,16 @@ def _diagnose_wait_failure(selector: str) -> None:
     for args in (
         ["kubectl", "get", "pods", "-n", NS, "-l", selector, "-o", "wide"],
         ["kubectl", "describe", "pods", "-n", NS, "-l", selector],
+        [
+            "kubectl",
+            "logs",
+            "-n",
+            NS,
+            "-l",
+            selector,
+            "--all-containers",
+            "--tail=80",
+        ],
     ):
         subprocess.run(args, check=False)
 
