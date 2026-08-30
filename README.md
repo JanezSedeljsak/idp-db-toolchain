@@ -105,7 +105,18 @@ Exports with `--from-db` only anonymize columns listed in the registry for that 
 
 - Job log: `$BACKUPPER_DATA_DIR/.backupper-jobs.jsonl`
 - Per-DB status: `.backupper-status-{db_id}.json`
-- Prometheus: `backupper_*{database="shop"}` — import `k8s/grafana-dashboard.json`
+- Prometheus metrics: `backupper_*{database="shop"}` on `:8080/metrics`
+
+### Grafana (dev stack only)
+
+The full `k8s/` stack includes **Prometheus** + **Grafana** (not deployed via `k8s/deploy/`):
+
+| Service | URL | Notes |
+|---------|-----|--------|
+| Grafana | http://localhost:30300 | `admin` / `admin` — dashboard auto-provisioned |
+| Prometheus | http://localhost:30909 | scrapes `backupper:8080/metrics` every 30s |
+
+Import `k8s/grafana-dashboard.json` manually if you run backupper outside this stack.
 
 ### Health checks
 

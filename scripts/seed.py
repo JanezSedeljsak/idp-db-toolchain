@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import random
 import time
+from typing import TYPE_CHECKING
 
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from scripts.models import AuditLog, Order, User
+
+if TYPE_CHECKING:
+    from scripts.config import Config
 
 COUNTS = {"users": 50, "orders": 200, "audit": 100}
 INTEGRATION_COUNTS = {"users": 5, "orders": 10, "audit": 5}
@@ -69,8 +73,7 @@ def _job(session: Session, job: str, count: int, *, rng: random.Random, prefix: 
         raise ValueError(f"unknown job: {job}")
 
 
-def seed_config(cfg, *, profile: str = "default") -> None:
-    from scripts.config import cfg_for_db
+def seed_config(cfg: Config, *, profile: str = "default") -> None:
     from scripts.database import session
 
     if profile == "integration":

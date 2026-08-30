@@ -8,3 +8,7 @@ nodes:
         hostPort: 30433
       - containerPort: 30456
         hostPort: 30456
+      - containerPort: 30300
+        hostPort: 30300
+      - containerPort: 30909
+        hostPort: 30909

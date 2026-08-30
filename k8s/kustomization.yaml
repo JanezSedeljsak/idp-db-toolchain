@@ -13,6 +13,10 @@ resources:
   - backupper-secret.yaml
   - backupper-deployment.yaml
   - backupper-service.yaml
+  - prometheus-config.yaml
+  - prometheus.yaml
+  - grafana-provisioning.yaml
+  - grafana.yaml
 
 commonLabels:
   app.kubernetes.io/part-of: idp-db-backupper

@@ -314,6 +314,8 @@ wizard() {
 Local services:
   postgres    localhost:30433
   localstack  localhost:30456
+  grafana     localhost:30300  (admin / admin)
+  prometheus  localhost:30909
 
 Useful commands:
   uv run python manage.py daily
