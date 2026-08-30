@@ -125,7 +125,7 @@ wait_backupper_ready() {
 
 ensure_host_dotenv() {
   if [[ ! -f backupper.toml ]]; then
-    uv run python -c "from scripts.config import ensure_dev_config; ensure_dev_config()"
+    uv run python -c "from config import ensure_dev_config; ensure_dev_config()"
   fi
   if [[ ! -f .env ]]; then
     cp .env.example .env
@@ -134,12 +134,19 @@ ensure_host_dotenv() {
 
 prepare_dev_cluster() {
   ensure_host_dotenv
-  uv run python -c "from scripts.dev_schema import apply_dev_schema; apply_dev_schema()"
-  uv run python -c "from scripts.config import load_config; from scripts import s3; s3.ensure_bucket(load_config())"
+  uv run python -c "from db.dev_schema import apply_dev_schema; apply_dev_schema()"
+  uv run python -c "from config import load_config; from storage import s3; s3.ensure_bucket(load_config())"
 }
 
 publish_smoke_job() {
   local job="db-backupper-smoke-$(date +%s)"
+  local secret_name="backupper-secrets"
+  local service_account=""
+  if [[ "${PUBLISH_TARGET:-local}" == "local" ]]; then
+    secret_name="backupper-env"
+  else
+    service_account="      serviceAccountName: backupper"
+  fi
   kubectl apply -f - <<EOF
 apiVersion: batch/v1
 kind: Job
@@ -151,14 +158,27 @@ spec:
   template:
     spec:
       restartPolicy: Never
+${service_account}
       containers:
         - name: backupper
           image: ${IMAGE}
           imagePullPolicy: IfNotPresent
           command: ["python", "manage.py", "backup"]
+          env:
+            - name: BACKUPPER_CONFIG
+              value: /etc/backupper/backupper.toml
           envFrom:
             - secretRef:
-                name: backupper-env
+                name: ${secret_name}
+                optional: true
+          volumeMounts:
+            - name: config
+              mountPath: /etc/backupper
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: backupper-config
 EOF
   kubectl wait -n "$DEPLOY_NAMESPACE" \
     --for=condition=complete \
@@ -346,7 +366,7 @@ run_build() {
 
 run_test() {
   run_lint
-  uv run mypy scripts tests
+  uv run mypy src tests
   uv run pytest -q -m "not integration" "$@"
 }
 
@@ -387,7 +407,7 @@ ci_build() {
 
 ci_test() {
   LOCKED=1 sync_deps
-  uv run mypy scripts tests
+  uv run mypy src tests
   uv run pytest -q -m "not integration" "$@"
 }
 

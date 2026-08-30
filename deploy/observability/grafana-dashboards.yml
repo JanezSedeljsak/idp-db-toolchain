@@ -1,0 +1,10 @@
+apiVersion: 1
+providers:
+  - name: backupper
+    orgId: 1
+    folder: idp-db-backupper
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards

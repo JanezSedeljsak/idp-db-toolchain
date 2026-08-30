@@ -114,7 +114,8 @@ The full `k8s/` stack includes **Prometheus** + **Grafana** (not deployed via `k
 | Service | URL | Notes |
 |---------|-----|--------|
 | Grafana | http://localhost:30300 | `admin` / `admin` — dashboard auto-provisioned |
-| Prometheus | http://localhost:30909 | scrapes `backupper:8080/metrics` every 30s |
+| Prometheus | http://localhost:30909 | scrapes `backupper:8080/metrics`; **alerts** at `/alerts` |
+| Alert rules | `k8s/prometheus-rules.yaml` | stale backup, failures, `/ready`, S3 errors |
 
 Import `k8s/grafana-dashboard.json` manually if you run backupper outside this stack.
 
@@ -144,7 +145,7 @@ export KUBECONFIG=~/.kube/platform
 PUBLISH_TARGET=remote ./dev.sh ci-publish-deploy
 ```
 
-Create `backupper-env` secret (AWS keys) and `backupper-config` ConfigMap (or mount your `backupper.toml`). Workload manifests: `k8s/deploy/`.
+Create the `backupper-secrets` Secret (database URLs via `DATABASES` JSON) and IRSA ServiceAccount — see `k8s/deploy/README.md`. Workload manifests: `k8s/deploy/`.
 
 ## Dev
 
@@ -156,29 +157,24 @@ Create `backupper-env` secret (AWS keys) and `backupper-config` ConfigMap (or mo
 
 Postgres `:30433`, LocalStack `:30456`. Three demo databases seeded via wizard.
 
-## Terraform (HCL)
+## Terraform
 
-The `terraform/` directory is **local dev only**. The `.tf` files are written in **HCL** (HashiCorp Configuration Language) — a small declarative language for describing infrastructure.
+| Path | When to use |
+|------|-------------|
+| `terraform/local/` | Optional LocalStack S3/IAM bootstrap — **not required** for `./dev.sh wizard` |
+| `terraform/prod/` | **Production AWS** — S3 bucket, EKS IRSA, Prometheus + Grafana on EC2 |
 
-What it does here:
+Local dev: kind + LocalStack only (`Postgres :30433`, `LocalStack :30456`, `Grafana :30300` in kind).
 
-- Creates the **LocalStack S3 bucket** (`db-backups`) and enables versioning
-- Creates a minimal **IAM user + policy** for put/get/list/delete on that bucket
-- Points the AWS provider at LocalStack (`localhost:30456`), not real AWS
-
-Why it exists:
-
-- Optional bootstrap if you want S3/IAM created outside the app (`manage.py setup` also calls `ensure_bucket` directly)
-- Documents the **intended S3 permissions** for production IAM policies (copy the policy shape into your cloud account)
-- Keeps cloud-shaped config in version control without touching the backupper runtime
-
-It is **not** part of the k8s deploy path. Do not `terraform apply` against a real AWS account without changing provider, credentials, and remote state. Production buckets and IAM are owned by the platform team.
+Production:
 
 ```bash
-cd terraform
-terraform init
-terraform apply   # LocalStack only
+cd terraform/prod
+cp terraform.tfvars.example terraform.tfvars   # eks_cluster_name, admin_cidr, metrics target
+terraform init && terraform apply
 ```
+
+Then patch `k8s/deploy/serviceaccount.yaml` with `backupper_irsa_role_arn` and deploy the workload. See [`terraform/prod/README.md`](terraform/prod/README.md).
 
 ## Backup format & Postgres versions
 
@@ -201,7 +197,6 @@ Plain SQL is useful as an **escape hatch** for odd upgrades, manual inspection, 
 
 1. **Logical dump/restore** (what this tool does): `pg_dump` on old → `pg_restore` / `psql` on new. Supported for many major jumps; test on a copy first.
 2. **`pg_upgrade`**: in-place cluster upgrade, faster for huge DBs, not what backupper orchestrates.
-3. **Avoid** the hand-rolled SQL dumper in `scripts/db.py` — it is for small integration tests only and will mishandle real types.
 
 Operational rule: run **`pg_dump` with the source major’s client**, **`pg_restore` with the target major’s client** (our Docker image should ship both or match the oldest source you still restore from).
 

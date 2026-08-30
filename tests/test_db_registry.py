@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from scripts import db_registry
-from scripts.config import ensure_dev_config
+from config import ensure_dev_config
+from db import registry as db_registry
 
 
 @pytest.fixture
@@ -14,8 +14,8 @@ def config_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def test_add_and_remove_database(config_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("scripts.db_registry.ping", lambda _url: None)
-    monkeypatch.setattr("scripts.s3.delete_database_backups", lambda _cfg, _db: ["k1"])
+    monkeypatch.setattr("db.registry.ping", lambda _url: None)
+    monkeypatch.setattr("storage.s3.delete_database_backups", lambda _cfg, _db: ["k1"])
 
     db_registry.validate_connection("postgres://localhost/warehouse")
 
@@ -36,7 +36,7 @@ def test_validate_connection_fails(config_dir: Path, monkeypatch: pytest.MonkeyP
     def fail_ping(_url: str) -> None:
         raise OSError("connection refused")
 
-    monkeypatch.setattr("scripts.db_registry.ping", fail_ping)
+    monkeypatch.setattr("db.registry.ping", fail_ping)
     with pytest.raises(ConnectionError, match="could not connect"):
         db_registry.validate_connection("postgres://localhost/nope")
 

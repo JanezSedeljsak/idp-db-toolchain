@@ -19,7 +19,7 @@ ignore = [
 ]
 
 [lint.isort]
-known-first-party = ["scripts"]
+known-first-party = ["backup", "cli", "config", "db", "logging_config", "observability", "ops", "paths", "storage"]
 
 [format]
 quote-style = "double"

@@ -10,13 +10,21 @@ resources:
   - postgres.yaml
   - localstack.yaml
   - backupper-config.yaml
-  - backupper-secret.yaml
   - backupper-deployment.yaml
   - backupper-service.yaml
   - prometheus-config.yaml
+  - prometheus-rules.yaml
   - prometheus.yaml
   - grafana-provisioning.yaml
   - grafana.yaml
 
 commonLabels:
   app.kubernetes.io/part-of: idp-db-backupper
+
+secretGenerator:
+  - name: backupper-env
+    literals:
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+    options:
+      disableNameSuffixHash: true

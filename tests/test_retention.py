@@ -1,9 +1,10 @@
 from datetime import date, datetime
 from pathlib import Path
 
-from scripts import retention, s3
-from scripts.config import Config, DatabaseTarget, cfg_for_db
-from scripts.retention import pick_monthly_keeper, pick_weekly_keepers, plan_retention
+from backup import retention
+from backup.retention import pick_monthly_keeper, pick_weekly_keepers, plan_retention
+from config import Config, DatabaseTarget, cfg_for_db
+from storage import s3
 
 
 def _obj(key: str, day: date) -> dict:

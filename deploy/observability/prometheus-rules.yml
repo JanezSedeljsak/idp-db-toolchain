@@ -1,0 +1,65 @@
+groups:
+  - name: backupper
+    rules:
+      - alert: BackupperNotReady
+        expr: backupper_ready == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: backupper readiness is failing
+          description: >-
+            /ready checks are failing (database connectivity or S3 API).
+            Inspect backupper logs and GET /health/full on the metrics port.
+
+      - alert: BackupperDatabaseUnreachable
+        expr: backupper_readiness_check{check=~"database:.+"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: backupper cannot reach {{ $labels.check }}
+          description: Postgres ping failed for {{ $labels.check }}.
+
+      - alert: BackupperS3Unreachable
+        expr: backupper_readiness_check{check="s3"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: backupper cannot reach S3
+          description: S3 API check failed — verify IAM/IRSA, bucket policy, and network egress.
+
+      - alert: BackupperBackupStale
+        expr: |
+          backupper_last_backup_timestamp_seconds > 0
+          and (time() - backupper_last_backup_timestamp_seconds) > 25 * 3600
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: no successful backup for {{ $labels.database }} in 25+ hours
+          description: >-
+            Last backup for {{ $labels.database }} is older than 25 hours.
+            Check scheduler, cron, and recent job failures.
+
+      - alert: BackupperBackupFailures
+        expr: backupper_backup_failure_streak > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: backup failures for {{ $labels.database }}
+          description: >-
+            {{ $labels.database }} has {{ $value }} consecutive backup failure(s).
+
+      - alert: BackupperS3UploadError
+        expr: backupper_s3_backup_error == 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: S3-related backup error for {{ $labels.database }}
+          description: >-
+            Latest backup failure for {{ $labels.database }} looks S3-related.
+            Check IAM permissions (s3:PutObject, s3:ListBucket) and bucket name.

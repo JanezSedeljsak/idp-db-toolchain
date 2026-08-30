@@ -5,10 +5,17 @@ namespace: idp-db-backupper
 
 resources:
   - ../namespace.yaml
-  - ../backupper-config.yaml
-  - ../backupper-deployment.yaml
+  - serviceaccount.yaml
+  - backupper-config.yaml
+  - backupper-deployment.yaml
   - ../backupper-service.yaml
+  - ../prometheus-rules.yaml
 
 commonLabels:
   app.kubernetes.io/part-of: idp-db-backupper
   app.kubernetes.io/managed-by: idp-db-backupper
+
+images:
+  - name: idp-db-backupper
+    newName: ghcr.io/your-org/idp-db-backupper
+    newTag: latest

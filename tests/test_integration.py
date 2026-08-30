@@ -1,6 +1,6 @@
 import pytest
 
-from scripts import db
+from db import inspect as db
 
 
 @pytest.mark.integration

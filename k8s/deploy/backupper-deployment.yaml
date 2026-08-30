@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backupper
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: backupper
+  template:
+    metadata:
+      labels:
+        app: backupper
+    spec:
+      serviceAccountName: backupper
+      terminationGracePeriodSeconds: 120
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: backupper
+          image: idp-db-backupper:local
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - containerPort: 8080
+              name: metrics
+          command: ["python", "manage.py", "schedule"]
+          envFrom:
+            - secretRef:
+                name: backupper-secrets
+                optional: true
+          env:
+            - name: BACKUPPER_CONFIG
+              value: /etc/backupper/backupper.toml
+          volumeMounts:
+            - name: config
+              mountPath: /etc/backupper
+              readOnly: true
+            - name: data
+              mountPath: /var/lib/backupper
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: metrics
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /health
+              port: metrics
+            periodSeconds: 5
+            failureThreshold: 12
+      volumes:
+        - name: config
+          configMap:
+            name: backupper-config
+        - name: data
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}

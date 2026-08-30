@@ -1,8 +1,10 @@
 import pytest
 from sqlalchemy import text
 
-from scripts import backup, db, s3
-from scripts.database import session
+from backup import core as backup
+from db import inspect as db
+from db.session import session
+from storage import s3
 
 
 @pytest.mark.integration

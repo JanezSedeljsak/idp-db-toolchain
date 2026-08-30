@@ -4,11 +4,12 @@ import os
 
 import pytest
 
-from scripts import backup, pg_tools
-from scripts import seed as seed_data
-from scripts.config import Config, cfg_for_db, load_config
-from scripts.database import session
-from scripts.dev_schema import apply_dev_schema
+from backup import core as backup
+from config import Config, cfg_for_db, load_config
+from db import pg_tools
+from db.dev_schema import apply_dev_schema
+from db.session import session
+from ops import seed as seed_data
 
 INTEGRATION_DB = "backupper_integration"
 

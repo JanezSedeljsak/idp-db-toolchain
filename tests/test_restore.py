@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from scripts import backup
-from scripts.config import Config, DatabaseTarget
+from backup import core as backup
+from config import Config, DatabaseTarget
 
 
 def _cfg() -> Config:
@@ -43,11 +43,11 @@ def test_restore_downloads_verifies_and_restores(
         dest.write_bytes(archive.read_bytes())
         return "abc123"
 
-    monkeypatch.setattr("scripts.backup.s3.download_to_file", fake_download)
-    monkeypatch.setattr("scripts.backup.s3.object_checksum", lambda _cfg, _key: "abc123")
-    monkeypatch.setattr("scripts.backup._restore_archive", lambda url, _path: restored.append(url))
+    monkeypatch.setattr("backup.core.s3.download_to_file", fake_download)
+    monkeypatch.setattr("backup.core.s3.object_checksum", lambda _cfg, _key: "abc123")
+    monkeypatch.setattr("backup.core._restore_archive", lambda url, _path: restored.append(url))
     monkeypatch.setattr(
-        "scripts.backup.streaming.iter_decompressed_file",
+        "backup.core.streaming.iter_decompressed_file",
         lambda path: iter([path.read_bytes()]),
     )
 
@@ -60,10 +60,10 @@ def test_restore_checksum_mismatch_aborts(monkeypatch: pytest.MonkeyPatch) -> No
     cfg = _cfg()
     key = "backups/shop/2026-08-30/backup-120000.dump.zst"
 
-    monkeypatch.setattr("scripts.backup.s3.download_to_file", lambda _cfg, _key, dest: "bad")
-    monkeypatch.setattr("scripts.backup.s3.object_checksum", lambda _cfg, _key: "expected")
+    monkeypatch.setattr("backup.core.s3.download_to_file", lambda _cfg, _key, dest: "bad")
+    monkeypatch.setattr("backup.core.s3.object_checksum", lambda _cfg, _key: "expected")
     monkeypatch.setattr(
-        "scripts.backup._restore_archive",
+        "backup.core._restore_archive",
         lambda *_args: (_ for _ in ()).throw(AssertionError("should not restore")),
     )
 
@@ -77,7 +77,7 @@ def test_restore_without_verify_streams_from_s3(monkeypatch: pytest.MonkeyPatch)
     calls: list[tuple[str, str]] = []
 
     monkeypatch.setattr(
-        "scripts.backup._pipe_restore",
+        "backup.core._pipe_restore",
         lambda database_url, restore_cfg, restore_key: calls.append((database_url, restore_key)),
     )
 

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.config import ensure_dev_config, load_config, load_env
+from config import ensure_dev_config, load_config, load_env
 
 
 def test_toml_defaults(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

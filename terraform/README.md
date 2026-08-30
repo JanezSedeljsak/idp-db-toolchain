@@ -1,7 +1,10 @@
-# LocalStack-only Terraform
+# Terraform
 
-This directory provisions the **local dev** S3 bucket and IAM user against LocalStack.
-It uses hardcoded test credentials and has no remote state backend.
+| Directory | Purpose |
+|-----------|---------|
+| [`local/`](local/) | **Optional** LocalStack bootstrap (S3 + IAM user). Dev works without this — `manage.py setup` creates the bucket. |
+| [`prod/`](prod/) | **Production AWS** — S3 backups bucket, EKS IRSA role, Prometheus + Grafana EC2 host |
 
-Do **not** run `terraform apply` against a real AWS account without reworking the provider,
-backend, and credentials first.
+**Local dev** uses kind + LocalStack (`./dev.sh wizard`). No AWS Terraform required.
+
+**Production** uses `terraform/prod` for AWS prerequisites, then `k8s/deploy/` for the backupper workload on EKS.

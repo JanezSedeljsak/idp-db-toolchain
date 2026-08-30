@@ -7,7 +7,8 @@ from pathlib import Path
 import pytest
 import zstandard as zstd
 
-from scripts import db, streaming
+from db import inspect as db
+from storage import streaming
 
 
 def test_format_sql_value_datetime() -> None:
@@ -57,7 +58,7 @@ def test_iter_reader() -> None:
 
 
 def test_prod_guard_rejects_defaults(monkeypatch) -> None:
-    from scripts.config import load_config
+    from config import load_config
 
     monkeypatch.setenv("APP_ENV", "prod")
     monkeypatch.setenv(

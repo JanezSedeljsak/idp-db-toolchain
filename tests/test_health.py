@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from scripts.health import liveness, readiness
+from observability.health import liveness, readiness
 
 
 def test_liveness() -> None:
@@ -10,10 +10,10 @@ def test_liveness() -> None:
 
 
 def test_readiness_all_ok(monkeypatch) -> None:
-    monkeypatch.setattr("scripts.health.ping", lambda _url: None)
-    monkeypatch.setattr("scripts.health.s3.check_reachable", lambda _cfg: None)
+    monkeypatch.setattr("observability.health.ping", lambda _url: None)
+    monkeypatch.setattr("observability.health.s3.check_reachable", lambda _cfg: None)
 
-    from scripts.config import Config, DatabaseTarget
+    from config import Config, DatabaseTarget
 
     cfg = Config(
         databases=[DatabaseTarget(id="shop", database_url="postgres://localhost/shop")],
@@ -45,10 +45,10 @@ def test_readiness_db_failure(monkeypatch) -> None:
     def fail_ping(_url: str) -> None:
         raise RuntimeError("connection refused")
 
-    monkeypatch.setattr("scripts.health.ping", fail_ping)
-    monkeypatch.setattr("scripts.health.s3.check_reachable", lambda _cfg: None)
+    monkeypatch.setattr("observability.health.ping", fail_ping)
+    monkeypatch.setattr("observability.health.s3.check_reachable", lambda _cfg: None)
 
-    from scripts.config import Config, DatabaseTarget
+    from config import Config, DatabaseTarget
 
     cfg = Config(
         databases=[DatabaseTarget(id="shop", database_url="postgres://localhost/shop")],

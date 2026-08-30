@@ -1,9 +1,11 @@
 import pytest
 
-from scripts import backup, db, s3
-from scripts import seed as seed_data
-from scripts.config import Config
-from scripts.database import session
+from backup import core as backup
+from config import Config
+from db import inspect as db
+from db.session import session
+from ops import seed as seed_data
+from storage import s3
 
 
 @pytest.mark.integration
