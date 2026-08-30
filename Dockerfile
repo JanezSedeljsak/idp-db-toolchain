@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM python:3.14-slim-bookworm
+FROM python:3.14-slim-bookworm AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
@@ -9,10 +9,6 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_PYTHON_DOWNLOADS=never
 
 WORKDIR /app
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends postgresql-client \
-    && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -23,8 +19,21 @@ COPY src ./src
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
-RUN useradd --create-home --uid 1000 --shell /usr/sbin/nologin backupper \
-    && chown -R backupper:backupper /app
+FROM python:3.14-slim-bookworm
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip uninstall -y pip \
+    && rm -rf /usr/local/lib/python3.14/site-packages/pip* \
+    && rm -f /usr/local/bin/pip /usr/local/bin/pip3 /usr/local/bin/pip3.14
+
+WORKDIR /app
+
+RUN useradd --create-home --uid 1000 --shell /usr/sbin/nologin backupper
+
+COPY --from=builder --chown=backupper:backupper /app /app
+
 USER backupper
 
 ENV PATH="/app/.venv/bin:$PATH"
