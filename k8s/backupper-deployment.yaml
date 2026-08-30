@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backupper
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: backupper
+  template:
+    metadata:
+      labels:
+        app: backupper
+    spec:
+      containers:
+        - name: backupper
+          image: idp-db-backupper:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: metrics
+          command: ["python", "manage.py", "schedule"]
+          envFrom:
+            - secretRef:
+                name: backupper-env
+          env:
+            - name: BACKUPPER_DATA_DIR
+              value: /var/lib/backupper
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/backupper
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          readinessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - |
+                  from scripts.config import load_config
+                  from scripts.database import ping
+                  ping(load_config().database_url)
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - |
+                  from scripts.config import load_config
+                  from scripts.database import ping
+                  ping(load_config().database_url)
+            initialDelaySeconds: 15
+            periodSeconds: 20
+      volumes:
+        - name: data
+          emptyDir: {}

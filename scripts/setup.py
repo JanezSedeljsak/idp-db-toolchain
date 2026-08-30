@@ -10,7 +10,8 @@ import httpx
 
 from scripts import k8s, s3, seed
 from scripts.config import DEFAULTS, load_config, load_env, write_env
-from scripts.database import migrate, ping, session
+from scripts.database import ping, session
+from scripts.dev_schema import apply_dev_schema
 
 
 def run(
@@ -32,6 +33,11 @@ def run(
         if not do_seed:
             do_seed = input("Seed sample data? (y/N): ").strip().lower() in ("y", "yes")
 
+    if env_path.exists() and force:
+        backup_path = env_path.with_suffix(".env.bak")
+        shutil.copy2(env_path, backup_path)
+        print(f"backed up existing .env -> {backup_path}")
+
     write_env(values)
     load_env()
     print(f"wrote {env_path}")
@@ -45,7 +51,7 @@ def run(
     _wait()
     cfg = load_config()
     s3.ensure_bucket(cfg)
-    migrate()
+    apply_dev_schema(cfg.database_url)
     if do_seed:
         with session(cfg.database_url) as s:
             seed.run(s)

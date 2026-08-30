@@ -15,6 +15,8 @@ metadata:
   name: postgres
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: postgres
@@ -28,24 +30,37 @@ spec:
           image: postgres:16-alpine
           ports:
             - containerPort: 5432
-          env:
-            - name: POSTGRES_USER
-              value: backupper
-            - name: POSTGRES_PASSWORD
-              value: backupper
-            - name: POSTGRES_DB
-              value: backupper
+          envFrom:
+            - secretRef:
+                name: postgres-credentials
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
           readinessProbe:
             exec:
               command: [pg_isready, -U, backupper]
             periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: [pg_isready, -U, backupper]
+            periodSeconds: 10
+            failureThreshold: 6
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
       volumes:
         - name: data
           persistentVolumeClaim:
             claimName: postgres-data
+        - name: init
+          configMap:
+            name: postgres-init
 ---
 apiVersion: v1
 kind: Service

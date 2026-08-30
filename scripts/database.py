@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
-from pathlib import Path
 
-from alembic.config import Config as AlembicConfig
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from alembic import command
 from scripts.config import load_config
+
+_engines: dict[str, Engine] = {}
 
 
 def db_url(url: str) -> str:
@@ -20,10 +20,25 @@ def db_url(url: str) -> str:
     return url
 
 
+def get_engine(database_url: str) -> Engine:
+    key = db_url(database_url)
+    engine = _engines.get(key)
+    if engine is None:
+        engine = create_engine(key, pool_pre_ping=True)
+        _engines[key] = engine
+    return engine
+
+
+def dispose_engines() -> None:
+    for engine in _engines.values():
+        engine.dispose()
+    _engines.clear()
+
+
 @contextmanager
 def session(database_url: str | None = None) -> Iterator[Session]:
     url = database_url or load_config().database_url
-    factory = sessionmaker(bind=create_engine(db_url(url), pool_pre_ping=True))
+    factory = sessionmaker(bind=get_engine(url))
     s = factory()
     try:
         yield s
@@ -36,12 +51,5 @@ def session(database_url: str | None = None) -> Iterator[Session]:
 
 
 def ping(database_url: str) -> None:
-    with create_engine(db_url(database_url)).connect() as conn:
+    with get_engine(database_url).connect() as conn:
         conn.execute(text("SELECT 1"))
-
-
-def migrate() -> None:
-    cfg = load_config()
-    alembic = AlembicConfig(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
-    alembic.set_main_option("sqlalchemy.url", db_url(cfg.database_url))
-    command.upgrade(alembic, "head")

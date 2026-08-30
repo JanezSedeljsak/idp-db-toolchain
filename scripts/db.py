@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import base64
+import json
+import uuid
 from datetime import date, datetime, time
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import text
@@ -18,14 +22,20 @@ def format_sql_value(value: Any) -> str:
         return "NULL"
     if isinstance(value, bool):
         return "TRUE" if value else "FALSE"
-    if isinstance(value, (int, float)):
+    if isinstance(value, (int, float, Decimal)):
         return str(value)
+    if isinstance(value, uuid.UUID):
+        return f"'{value}'"
     if isinstance(value, datetime):
         return f"'{value.astimezone().isoformat()}'"
     if isinstance(value, (date, time)):
         return f"'{value.isoformat()}'"
+    if isinstance(value, (dict, list)):
+        return "'" + json.dumps(value).replace("'", "''") + "'"
+    if isinstance(value, memoryview):
+        value = value.tobytes()
     if isinstance(value, bytes):
-        value = value.decode("utf-8", errors="replace")
+        return f"'\\x{value.hex()}'"
     if isinstance(value, str):
         return "'" + value.replace("'", "''") + "'"
     return "'" + str(value).replace("'", "''") + "'"
@@ -118,18 +128,64 @@ def reset_sequences(session: Session) -> None:
         )
     ).fetchall()
     for table, column in rows:
+        table_ident = quote_ident(table)
+        column_ident = quote_ident(column)
         session.execute(
             text(
-                f"SELECT setval(pg_get_serial_sequence('{table}', '{column}'), "
-                f"COALESCE((SELECT MAX({quote_ident(column)}) FROM {quote_ident(table)}), 1), true)"
-            )
+                f"SELECT setval(pg_get_serial_sequence(:table, :column), "
+                f"COALESCE((SELECT MAX({column_ident}) FROM {table_ident}), 1), true)"
+            ),
+            {"table": table, "column": column},
         )
 
 
 def restore(session: Session, dump_sql: str) -> None:
-    for index, stmt in enumerate(split_sql_statements(dump_sql), start=1):
-        try:
-            session.execute(text(stmt))
-        except Exception as exc:
-            raise RuntimeError(f"exec statement {index}: {exc}\n{stmt}") from exc
-    reset_sequences(session)
+    with session.begin_nested():
+        for index, stmt in enumerate(split_sql_statements(dump_sql), start=1):
+            try:
+                session.execute(text(stmt))
+            except Exception as exc:
+                raise RuntimeError(f"exec statement {index}: {exc}\n{stmt}") from exc
+        reset_sequences(session)
+
+
+def table_row_counts(session: Session) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for table in list_tables(session):
+        counts[table] = session.execute(
+            text(f"SELECT COUNT(*) FROM {quote_ident(table)}")
+        ).scalar_one()
+    return counts
+
+
+def compare_databases(source_url: str, target_url: str) -> list[str]:
+    from scripts.database import session as db_session
+
+    diffs: list[str] = []
+    with db_session(source_url) as source, db_session(target_url) as target:
+        source_tables = order_tables(list_tables(source))
+        target_tables = order_tables(list_tables(target))
+        if source_tables != target_tables:
+            diffs.append(f"tables differ: {source_tables} vs {target_tables}")
+            return diffs
+
+        for table in source_tables:
+            source_cols, source_rows = dump_table(source, table)
+            target_cols, target_rows = dump_table(target, table)
+            if source_cols != target_cols:
+                diffs.append(f"{table}: column mismatch")
+                continue
+            if len(source_rows) != len(target_rows):
+                diffs.append(f"{table}: row count {len(source_rows)} vs {len(target_rows)}")
+                continue
+            for index, (left, right) in enumerate(zip(source_rows, target_rows, strict=True)):
+                if left != right:
+                    diffs.append(f"{table}: row {index} differs")
+                    break
+    return diffs
+
+
+def decode_bytea_literal(value: str) -> bytes:
+    if value.startswith("\\x"):
+        return bytes.fromhex(value[2:])
+    return base64.b64decode(value)

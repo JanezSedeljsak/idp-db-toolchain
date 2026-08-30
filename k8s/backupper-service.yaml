@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: backupper
+spec:
+  selector:
+    app: backupper
+  ports:
+    - name: metrics
+      port: 8080
+      targetPort: 8080

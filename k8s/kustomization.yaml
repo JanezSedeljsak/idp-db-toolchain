@@ -5,8 +5,13 @@ namespace: idp-db-backupper
 
 resources:
   - namespace.yaml
+  - postgres-secret.yaml
+  - postgres-init.yaml
   - postgres.yaml
   - localstack.yaml
+  - backupper-secret.yaml
+  - backupper-deployment.yaml
+  - backupper-service.yaml
 
 commonLabels:
   app.kubernetes.io/part-of: idp-db-backupper

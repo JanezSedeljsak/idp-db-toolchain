@@ -4,6 +4,8 @@ metadata:
   name: localstack
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: localstack
@@ -22,11 +24,24 @@ spec:
               value: s3
             - name: DEBUG
               value: "0"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
           readinessProbe:
             httpGet:
               path: /_localstack/health
               port: 4566
             periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /_localstack/health
+              port: 4566
+            periodSeconds: 10
+            failureThreshold: 6
 ---
 apiVersion: v1
 kind: Service

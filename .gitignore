@@ -11,3 +11,4 @@ bin/
 *.tfstate
 *.tfstate.*
 .terraform.lock.hcl
+todo.md

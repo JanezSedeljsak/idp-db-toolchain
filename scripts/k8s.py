@@ -1,13 +1,32 @@
-"""Minimal k8s helpers: apply manifests and wait. Services use NodePort (no port-forward)."""
-
 from __future__ import annotations
 
+import os
 import subprocess
 
 NS = "idp-db-backupper"
+IMAGE = "idp-db-backupper:local"
+KIND_CLUSTER = "idp-db-backupper"
 
 
-def up() -> None:
+def build_image() -> None:
+    subprocess.run(
+        ["docker", "build", "-t", IMAGE, "."],
+        check=True,
+        env={**os.environ, "DOCKER_BUILDKIT": "1"},
+    )
+
+
+def load_image(cluster: str = KIND_CLUSTER) -> None:
+    subprocess.run(
+        ["kind", "load", "docker-image", IMAGE, "--name", cluster],
+        check=True,
+    )
+
+
+def up(*, build_image_first: bool = False) -> None:
+    if build_image_first:
+        build_image()
+        load_image()
     subprocess.run(["kubectl", "apply", "-k", "k8s"], check=True)
     subprocess.run(
         [
