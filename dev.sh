@@ -420,7 +420,7 @@ ci_integration() {
   if kind_cluster_exists; then
     kind load docker-image idp-db-backupper:local --name "$KIND_CLUSTER"
   fi
-  uv run python manage.py setup -y --force --seed
+  uv run python manage.py setup -y --force
   run_test_integration
   run_smoke
 }
