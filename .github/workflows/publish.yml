@@ -31,5 +31,5 @@ jobs:
           RUN_SMOKE: ${{ inputs.run_smoke }}
         run: |
           TAG="${PUBLISH_TAG:-$(git rev-parse --short HEAD)}"
-          export IMAGE="ghcr.io/${{ github.repository }}:${TAG}"
+          export IMAGE="ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]'):${TAG}"
           ./dev.sh ci-publish-deploy

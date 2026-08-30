@@ -366,7 +366,7 @@ ci_build() {
   docker tag "$IMAGE" idp-db-backupper:local
 
   if [[ "${GITHUB_REF:-}" == "refs/heads/main" && -n "${IMAGE_REGISTRY:-}" ]]; then
-    REMOTE_IMAGE="${IMAGE_REGISTRY}:${tag}"
+    REMOTE_IMAGE="$(echo "${IMAGE_REGISTRY}" | tr '[:upper:]' '[:lower:]'):${tag}"
     docker tag "$IMAGE" "$REMOTE_IMAGE"
     docker push "$REMOTE_IMAGE"
     echo "pushed ${REMOTE_IMAGE}"

@@ -44,7 +44,9 @@ jobs:
       - name: Build and push image
         env:
           IMAGE_REGISTRY: ghcr.io/${{ github.repository }}
-        run: ./dev.sh ci-build
+        run: |
+          export IMAGE_REGISTRY="$(echo "${IMAGE_REGISTRY}" | tr '[:upper:]' '[:lower:]')"
+          ./dev.sh ci-build
       - run: docker save -o image.tar idp-db-backupper:local
       - uses: actions/upload-artifact@v4
         with:

@@ -180,9 +180,7 @@ def load_config(*, require_prod_safe: bool = True) -> Config:
         app_env=_pick_str("APP_ENV", toml_data.get("app_env"), "dev").lower(),
         zstd_level=_pick_int("ZSTD_LEVEL", backup.get("zstd_level"), 3),
         notify_webhook_url=_pick_str("NOTIFY_WEBHOOK_URL", notify.get("webhook_url"), ""),
-        max_schedule_failures=_pick_int(
-            "MAX_SCHEDULE_FAILURES", scheduler.get("max_failures"), 5
-        ),
+        max_schedule_failures=_pick_int("MAX_SCHEDULE_FAILURES", scheduler.get("max_failures"), 5),
         slow_query_ms=_pick_int("SLOW_QUERY_MS", metrics.get("slow_query_ms"), 5000),
         metrics_port=_pick_int("METRICS_PORT", metrics.get("port"), 8080),
         anonymize_salt=_pick_str("ANONYMIZE_SALT", anonymize.get("salt"), "backupper"),
