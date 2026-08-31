@@ -105,7 +105,7 @@ Exports with `--from-db` only anonymize columns listed in the registry for that 
 
 - Job log: `$DB_TOOLCHAIN_DATA_DIR/.db-toolchain-jobs.jsonl`
 - Per-DB status: `.db-toolchain-status-{db_id}.json`
-- Prometheus metrics: `db-toolchain_*{database="shop"}` on `:8080/metrics`
+- Prometheus metrics: `db_toolchain_*{database="shop"}` on `:8080/metrics`
 
 ### Grafana (dev stack only)
 
@@ -164,8 +164,6 @@ Postgres `:30433`, LocalStack `:30456`. Three demo databases seeded via wizard.
 | `terraform/local/` | Optional LocalStack S3/IAM bootstrap — **not required** for `./dev.sh wizard` |
 | `terraform/prod/` | **Production AWS** — S3 bucket, EKS IRSA, Prometheus + Grafana on EC2 |
 
-Local dev: kind + LocalStack only (`Postgres :30433`, `LocalStack :30456`, `Grafana :30300` in kind).
-
 Production:
 
 ```bash
@@ -176,33 +174,8 @@ terraform init && terraform apply
 
 Then patch `k8s/deploy/serviceaccount.yaml` with `db_toolchain_irsa_role_arn` and deploy the workload. See [`terraform/prod/README.md`](terraform/prod/README.md).
 
-## Backup format & Postgres versions
+## Backup format
 
-Backups use **`pg_dump -Fc`** (PostgreSQL custom archive), then **zstd** compression. Restore uses **`pg_restore`** on the target cluster.
+Backups use **`pg_dump -Fc`** (PostgreSQL custom archive), compressed with **zstd**. Restore with **`pg_restore`** on the target cluster.
 
-### Is plain SQL (ANSI-style text) worth it?
-
-There is no true Postgres-agnostic “ANSI dump”. In practice you choose between:
-
-| Format | Tooling | Portability | Size / speed |
-|--------|---------|-------------|--------------|
-| **Custom `-Fc`** (current) | `pg_restore` | Good across versions when you use **`pg_restore` from the target (newer) major** | Best |
-| **Plain SQL `-Fp`** | `psql -f` | Human-readable; still Postgres-specific DDL/DML; slowest, largest | Worst |
-
-**Custom format is the right default** for this IDP: smaller over the wire, faster, and PostgreSQL explicitly supports logical dumps across major versions (e.g. 12 → 19) as long as you restore with a client **at least as new** as the target server.
-
-Plain SQL is useful as an **escape hatch** for odd upgrades, manual inspection, or importing into non-Postgres tools — not as the daily backup format. If we add it later, it would be a separate export mode (`export --format plain`), not a replacement for scheduled backups.
-
-### Upgrade path (pg12 → pg19)
-
-1. **Logical dump/restore** (what this tool does): `pg_dump` on old → `pg_restore` / `psql` on new. Supported for many major jumps; test on a copy first.
-2. **`pg_upgrade`**: in-place cluster upgrade, faster for huge DBs, not what db-toolchain orchestrates.
-
-Operational rule: run **`pg_dump` with the source major’s client**, **`pg_restore` with the target major’s client** (our Docker image should ship both or match the oldest source you still restore from).
-
-## Future ideas
-
-- Backup verification reports in S3
-- Replication lag / standby health per database
-- Scheduled anonymized exports to a staging bucket
-- Per-tenant retention overrides
+For major-version moves (e.g. pg12 → pg19), use logical dump/restore: **`pg_dump` with the source major’s client**, **`pg_restore` with the target major’s client** (the Docker image should include clients for the versions you still restore from).
