@@ -39,12 +39,12 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
             item.add_marker(skip)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="session")
 def live_cfg() -> Config:
     return load_config()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="session")
 def seeded_databases(live_cfg: Config):
     apply_dev_schema()
     targets = []

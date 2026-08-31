@@ -34,6 +34,7 @@ commands:
   ci-lint            CI lint job
   ci-build           CI build job (+ push to ghcr.io on main)
   ci-test            CI unit test job
+  ci-coverage        CI coverage job (unit tests + coverage report)
   ci-integration     CI integration job (needs kind + docker image)
 EOF
 }
@@ -411,6 +412,11 @@ ci_test() {
   uv run pytest -q -m "not integration" "$@"
 }
 
+ci_coverage() {
+  LOCKED=1 sync_deps
+  uv run pytest -q -m "not integration" --cov --cov-report=term-missing --cov-report=xml "$@"
+}
+
 ci_integration() {
   install_pg_client
   LOCKED=1 sync_deps
@@ -455,6 +461,9 @@ case "$cmd" in
     ;;
   ci-test)
     ci_test "$@"
+    ;;
+  ci-coverage)
+    ci_coverage "$@"
     ;;
   ci-integration)
     ci_integration "$@"
