@@ -3,8 +3,20 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "**/*.md"
+      - "**/*.txt"
+      - "**/*.rst"
+      - "**/LICENSE"
+      - "**/LICENSE.*"
   pull_request:
     branches: [main]
+    paths-ignore:
+      - "**/*.md"
+      - "**/*.txt"
+      - "**/*.rst"
+      - "**/LICENSE"
+      - "**/LICENSE.*"
   workflow_dispatch:
     inputs:
       image_tag:
