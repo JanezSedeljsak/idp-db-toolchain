@@ -3,43 +3,43 @@ kind: ConfigMap
 metadata:
   name: prometheus-rules
 data:
-  backupper.yml: |
+  db-toolchain.yml: |
     groups:
-      - name: backupper
+      - name: db-toolchain
         rules:
           - alert: BackupperNotReady
-            expr: backupper_ready == 0
+            expr: db_toolchain_ready == 0
             for: 5m
             labels:
               severity: critical
             annotations:
-              summary: backupper readiness is failing
+              summary: db-toolchain readiness is failing
               description: >-
                 /ready checks are failing (database connectivity or S3 API).
-                Inspect backupper logs and GET /health/full on the metrics port.
+                Inspect db-toolchain logs and GET /health/full on the metrics port.
 
           - alert: BackupperDatabaseUnreachable
-            expr: backupper_readiness_check{check=~"database:.+"} == 0
+            expr: db_toolchain_readiness_check{check=~"database:.+"} == 0
             for: 5m
             labels:
               severity: critical
             annotations:
-              summary: backupper cannot reach {{ $labels.check }}
+              summary: db-toolchain cannot reach {{ $labels.check }}
               description: Postgres ping failed for {{ $labels.check }}.
 
           - alert: BackupperS3Unreachable
-            expr: backupper_readiness_check{check="s3"} == 0
+            expr: db_toolchain_readiness_check{check="s3"} == 0
             for: 5m
             labels:
               severity: critical
             annotations:
-              summary: backupper cannot reach S3
+              summary: db-toolchain cannot reach S3
               description: S3 API check failed — verify IAM/IRSA, bucket policy, and network egress.
 
           - alert: BackupperBackupStale
             expr: |
-              backupper_last_backup_timestamp_seconds > 0
-              and (time() - backupper_last_backup_timestamp_seconds) > 25 * 3600
+              db_toolchain_last_backup_timestamp_seconds > 0
+              and (time() - db_toolchain_last_backup_timestamp_seconds) > 25 * 3600
             for: 15m
             labels:
               severity: warning
@@ -50,7 +50,7 @@ data:
                 Check scheduler, cron, and recent job failures.
 
           - alert: BackupperBackupFailures
-            expr: backupper_backup_failure_streak > 0
+            expr: db_toolchain_backup_failure_streak > 0
             for: 10m
             labels:
               severity: warning
@@ -60,7 +60,7 @@ data:
                 {{ $labels.database }} has {{ $value }} consecutive backup failure(s).
 
           - alert: BackupperS3UploadError
-            expr: backupper_s3_backup_error == 1
+            expr: db_toolchain_s3_backup_error == 1
             for: 5m
             labels:
               severity: warning

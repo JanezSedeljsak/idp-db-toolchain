@@ -1,6 +1,6 @@
 aws_region = "eu-central-1"
 environment = "prod"
-name_prefix = "idp-db-backupper"
+name_prefix = "idp-db-toolchain"
 
 # Your existing EKS cluster (terraform does not create the cluster)
 eks_cluster_name = "your-eks-cluster"
@@ -9,8 +9,8 @@ eks_cluster_name = "your-eks-cluster"
 admin_cidr = "203.0.113.10/32"
 
 # Host:port reachable from the observability EC2 instance
-backupper_metrics_target = "backupper.internal.example.com:8080"
-backupper_metrics_scheme = "http"
+db_toolchain_metrics_target = "db-toolchain.internal.example.com:8080"
+db_toolchain_metrics_scheme = "http"
 
 enable_observability_host = true
 observability_instance_type = "t4g.small"

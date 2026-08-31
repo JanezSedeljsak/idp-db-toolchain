@@ -5,4 +5,4 @@ from pathlib import Path
 
 
 def data_dir() -> Path:
-    return Path(os.getenv("BACKUPPER_DATA_DIR", ".")).resolve()
+    return Path(os.getenv("DB_TOOLCHAIN_DATA_DIR", ".")).resolve()

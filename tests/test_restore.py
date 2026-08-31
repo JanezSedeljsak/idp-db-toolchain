@@ -23,10 +23,10 @@ def _cfg() -> Config:
         max_schedule_failures=5,
         slow_query_ms=5000,
         metrics_port=8080,
-        anonymize_salt="backupper",
+        anonymize_salt="db-toolchain",
         backup_cron="0 2 * * *",
         retention_cron="0 3 1 * *",
-        config_path=Path("backupper.toml"),
+        config_path=Path("db-toolchain.toml"),
     )
 
 

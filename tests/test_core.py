@@ -63,7 +63,7 @@ def test_prod_guard_rejects_defaults(monkeypatch) -> None:
     monkeypatch.setenv("APP_ENV", "prod")
     monkeypatch.setenv(
         "DATABASES",
-        json.dumps([{"id": "shop", "url": "postgres://backupper:backupper@localhost/shop"}]),
+        json.dumps([{"id": "shop", "url": "postgres://db-toolchain:db-toolchain@localhost/shop"}]),
     )
     with pytest.raises(RuntimeError, match="dev"):
         load_config()

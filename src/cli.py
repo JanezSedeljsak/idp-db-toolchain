@@ -156,7 +156,7 @@ def databases_remove(
             )
         else:
             prune = False
-    _confirm(f"remove {db_id} from backupper.toml", yes=yes)
+    _confirm(f"remove {db_id} from db-toolchain.toml", yes=yes)
     with job_run("databases-remove", database=db_id, prune=prune):
         deleted = db_registry.remove_database(db_id, prune_backups=bool(prune), cfg=cfg)
     log.info("removed %s from config", db_id)
@@ -172,7 +172,7 @@ def confirm_bool(prompt: str, *, default: bool = False) -> bool:
 
 @db_app.callback()
 def databases_group() -> None:
-    """Manage databases registered in backupper.toml."""
+    """Manage databases registered in db-toolchain.toml."""
 
 
 @app.command()

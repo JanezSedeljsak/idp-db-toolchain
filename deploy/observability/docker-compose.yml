@@ -11,7 +11,7 @@ services:
       - "9090:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./prometheus-rules.yml:/etc/prometheus/rules/backupper.yml:ro
+      - ./prometheus-rules.yml:/etc/prometheus/rules/db-toolchain.yml:ro
       - prometheus_data:/prometheus
 
   grafana:
@@ -28,7 +28,7 @@ services:
     volumes:
       - ./grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
       - ./grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
-      - ./grafana-dashboard.json:/var/lib/grafana/dashboards/idp-db-backupper.json:ro
+      - ./grafana-dashboard.json:/var/lib/grafana/dashboards/idp-db-toolchain.json:ro
       - grafana_data:/var/lib/grafana
 
 volumes:

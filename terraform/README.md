@@ -7,4 +7,4 @@
 
 **Local dev** uses kind + LocalStack (`./dev.sh wizard`). No AWS Terraform required.
 
-**Production** uses `terraform/prod` for AWS prerequisites, then `k8s/deploy/` for the backupper workload on EKS.
+**Production** uses `terraform/prod` for AWS prerequisites, then `k8s/deploy/` for the idp-db-toolchain workload on EKS.

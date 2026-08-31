@@ -67,8 +67,8 @@ spec:
           configMap:
             name: grafana-dashboards
             items:
-              - key: idp-db-backupper.json
-                path: idp-db-backupper.json
+              - key: idp-db-toolchain.json
+                path: idp-db-toolchain.json
         - name: data
           emptyDir: {}
 ---

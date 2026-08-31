@@ -1,4 +1,4 @@
-# IAM policy for the backupper IRSA role (attach to role referenced in serviceaccount.yaml).
+# IAM policy for the idp-db-toolchain IRSA role (attach to role referenced in serviceaccount.yaml).
 {
   "Version": "2012-10-17",
   "Statement": [

@@ -30,14 +30,14 @@ def run(
     if not shutil.which("kubectl"):
         raise RuntimeError("kubectl not found")
 
-    config_path = Path.cwd() / "backupper.toml"
+    config_path = Path.cwd() / "db-toolchain.toml"
     if config_path.exists() and not force:
         raise RuntimeError(f"{config_path} exists — use --force to re-copy defaults")
 
     if config_path.exists() and force:
         backup_path = config_path.with_suffix(".toml.bak")
         shutil.copy2(config_path, backup_path)
-        print(f"backed up existing backupper.toml -> {backup_path}")
+        print(f"backed up existing db-toolchain.toml -> {backup_path}")
 
     if not config_path.exists() or force:
         ensure_dev_config(force=force)

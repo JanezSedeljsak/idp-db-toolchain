@@ -4,9 +4,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
-IMAGE="${IMAGE:-idp-db-backupper:local}"
-KIND_CLUSTER="${KIND_CLUSTER:-idp-db-backupper}"
-DEPLOY_NAMESPACE="${DEPLOY_NAMESPACE:-idp-db-backupper}"
+IMAGE="${IMAGE:-idp-db-toolchain:local}"
+KIND_CLUSTER="${KIND_CLUSTER:-idp-db-toolchain}"
+DEPLOY_NAMESPACE="${DEPLOY_NAMESPACE:-idp-db-toolchain}"
 DEPLOY_KUSTOMIZE="${DEPLOY_KUSTOMIZE:-k8s/deploy}"
 
 usage() {
@@ -113,19 +113,19 @@ publish_tag() {
 wait_k8s_ready() {
   kubectl wait -n "$DEPLOY_NAMESPACE" \
     --for=condition=ready pod \
-    -l app.kubernetes.io/part-of=idp-db-backupper \
+    -l app.kubernetes.io/part-of=idp-db-toolchain \
     --timeout=180s
 }
 
-wait_backupper_ready() {
+wait_db_toolchain_ready() {
   kubectl wait -n "$DEPLOY_NAMESPACE" \
     --for=condition=ready pod \
-    -l app=backupper \
+    -l app=db-toolchain \
     --timeout=180s
 }
 
 ensure_host_dotenv() {
-  if [[ ! -f backupper.toml ]]; then
+  if [[ ! -f db-toolchain.toml ]]; then
     uv run python -c "from config import ensure_dev_config; ensure_dev_config()"
   fi
   if [[ ! -f .env ]]; then
@@ -140,13 +140,13 @@ prepare_dev_cluster() {
 }
 
 publish_smoke_job() {
-  local job="db-backupper-smoke-$(date +%s)"
-  local secret_name="backupper-secrets"
+  local job="db-toolchain-smoke-$(date +%s)"
+  local secret_name="db-toolchain-secrets"
   local service_account=""
   if [[ "${PUBLISH_TARGET:-local}" == "local" ]]; then
-    secret_name="backupper-env"
+    secret_name="db-toolchain-env"
   else
-    service_account="      serviceAccountName: backupper"
+    service_account="      serviceAccountName: db-toolchain"
   fi
   kubectl apply -f - <<EOF
 apiVersion: batch/v1
@@ -161,25 +161,25 @@ spec:
       restartPolicy: Never
 ${service_account}
       containers:
-        - name: backupper
+        - name: db-toolchain
           image: ${IMAGE}
           imagePullPolicy: IfNotPresent
           command: ["python", "manage.py", "backup"]
           env:
-            - name: BACKUPPER_CONFIG
-              value: /etc/backupper/backupper.toml
+            - name: DB_TOOLCHAIN_CONFIG
+              value: /etc/db-toolchain/db-toolchain.toml
           envFrom:
             - secretRef:
                 name: ${secret_name}
                 optional: true
           volumeMounts:
             - name: config
-              mountPath: /etc/backupper
+              mountPath: /etc/db-toolchain
               readOnly: true
       volumes:
         - name: config
           configMap:
-            name: backupper-config
+            name: db-toolchain-config
 EOF
   kubectl wait -n "$DEPLOY_NAMESPACE" \
     --for=condition=complete \
@@ -190,25 +190,25 @@ EOF
 }
 
 rollout_deploy() {
-  kubectl set image "deployment/backupper" "backupper=${IMAGE}" -n "$DEPLOY_NAMESPACE"
+  kubectl set image "deployment/db-toolchain" "db-toolchain=${IMAGE}" -n "$DEPLOY_NAMESPACE"
 
-  if ! kubectl rollout status "deployment/backupper" -n "$DEPLOY_NAMESPACE" --timeout=300s; then
+  if ! kubectl rollout status "deployment/db-toolchain" -n "$DEPLOY_NAMESPACE" --timeout=300s; then
     echo "rollout of ${IMAGE} failed to become ready — rolling back" >&2
-    kubectl rollout undo "deployment/backupper" -n "$DEPLOY_NAMESPACE"
-    kubectl rollout status "deployment/backupper" -n "$DEPLOY_NAMESPACE" --timeout=180s
-    echo "rolled back deployment/backupper in ${DEPLOY_NAMESPACE} to the previous revision" >&2
+    kubectl rollout undo "deployment/db-toolchain" -n "$DEPLOY_NAMESPACE"
+    kubectl rollout status "deployment/db-toolchain" -n "$DEPLOY_NAMESPACE" --timeout=180s
+    echo "rolled back deployment/db-toolchain in ${DEPLOY_NAMESPACE} to the previous revision" >&2
     return 1
   fi
 
-  kubectl annotate deployment/backupper -n "$DEPLOY_NAMESPACE" \
-    "backupper.dev/deployed-at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-    "backupper.dev/image=${IMAGE}" \
+  kubectl annotate deployment/db-toolchain -n "$DEPLOY_NAMESPACE" \
+    "db-toolchain.dev/deployed-at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    "db-toolchain.dev/image=${IMAGE}" \
     --overwrite
 }
 
 deploy_remote() {
   if [[ -z "${IMAGE:-}" ]]; then
-    echo "IMAGE is required — use the registry ref built by CI (e.g. ghcr.io/org/idp-db-backupper:abc123)" >&2
+    echo "IMAGE is required — use the registry ref built by CI (e.g. ghcr.io/org/idp-db-toolchain:abc123)" >&2
     exit 1
   fi
 
@@ -225,7 +225,7 @@ deploy_remote() {
 deploy_local() {
   local tag
   tag="$(publish_tag)"
-  IMAGE="idp-db-backupper:${tag}"
+  IMAGE="idp-db-toolchain:${tag}"
   export IMAGE
 
   if ! kind_cluster_exists; then
@@ -243,7 +243,7 @@ deploy_local() {
   wait_k8s_ready
   prepare_dev_cluster
   rollout_deploy
-  wait_backupper_ready
+  wait_db_toolchain_ready
 
   echo "published ${IMAGE} → kind/${KIND_CLUSTER} (rolling update complete)"
 
@@ -322,7 +322,7 @@ wizard() {
     fi
   fi
 
-  step "5/$total Docker image (for the backupper Deployment)"
+  step "5/$total Docker image (for the idp-db-toolchain Deployment)"
   if confirm "Build and load $IMAGE into kind?" "n"; then
     docker_build
     kind load docker-image "$IMAGE" --name "$KIND_CLUSTER"
@@ -391,10 +391,10 @@ ci_build() {
   uv build
   local tag
   tag="$(publish_tag)"
-  IMAGE="idp-db-backupper:${tag}"
+  IMAGE="idp-db-toolchain:${tag}"
   export IMAGE
   docker_build
-  docker tag "$IMAGE" idp-db-backupper:local
+  docker tag "$IMAGE" idp-db-toolchain:local
 
   if [[ -n "${IMAGE_REGISTRY:-}" ]]; then
     if [[ "${GITHUB_REF:-}" == "refs/heads/main" || "${GITHUB_EVENT_NAME:-}" == "workflow_dispatch" ]]; then
@@ -424,7 +424,7 @@ ci_integration() {
     docker_build
   fi
   if kind_cluster_exists; then
-    kind load docker-image idp-db-backupper:local --name "$KIND_CLUSTER"
+    kind load docker-image idp-db-toolchain:local --name "$KIND_CLUSTER"
   fi
   uv run python manage.py setup -y --force
   run_test_integration

@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: backupper
+  name: db-toolchain
 spec:
   replicas: 1
   strategy:
@@ -11,12 +11,13 @@ spec:
       maxUnavailable: 0
   selector:
     matchLabels:
-      app: backupper
+      app: db-toolchain
   template:
     metadata:
       labels:
-        app: backupper
+        app: db-toolchain
     spec:
+      serviceAccountName: db-toolchain
       terminationGracePeriodSeconds: 120
       securityContext:
         runAsNonRoot: true
@@ -26,8 +27,8 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       containers:
-        - name: backupper
-          image: idp-db-backupper:local
+        - name: db-toolchain
+          image: idp-db-toolchain:local
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -40,16 +41,17 @@ spec:
           command: ["python", "manage.py", "schedule"]
           envFrom:
             - secretRef:
-                name: backupper-env
+                name: db-toolchain-secrets
+                optional: true
           env:
-            - name: BACKUPPER_CONFIG
-              value: /etc/backupper/backupper.toml
+            - name: DB_TOOLCHAIN_CONFIG
+              value: /etc/db-toolchain/db-toolchain.toml
           volumeMounts:
             - name: config
-              mountPath: /etc/backupper
+              mountPath: /etc/db-toolchain
               readOnly: true
             - name: data
-              mountPath: /var/lib/backupper
+              mountPath: /var/lib/db-toolchain
             - name: tmp
               mountPath: /tmp
           resources:
@@ -84,7 +86,7 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: backupper-config
+            name: db-toolchain-config
         - name: data
           emptyDir: {}
         - name: tmp

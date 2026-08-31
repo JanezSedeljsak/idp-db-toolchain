@@ -12,7 +12,7 @@ data:
       - /etc/prometheus/rules/*.yml
 
     scrape_configs:
-      - job_name: backupper
+      - job_name: db-toolchain
         metrics_path: /metrics
         static_configs:
-          - targets: ["backupper:8080"]
+          - targets: ["db-toolchain:8080"]

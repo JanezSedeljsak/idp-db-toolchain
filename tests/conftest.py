@@ -11,7 +11,7 @@ from db.dev_schema import apply_dev_schema
 from db.session import session
 from ops import seed as seed_data
 
-INTEGRATION_DB = "backupper_integration"
+INTEGRATION_DB = "db_toolchain_integration"
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:

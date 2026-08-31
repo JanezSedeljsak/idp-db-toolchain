@@ -16,11 +16,11 @@ from paths import data_dir
 
 
 def metrics_path(db_id: str) -> Path:
-    return data_dir() / f".backupper-metrics-{db_id}.json"
+    return data_dir() / f".db-toolchain-metrics-{db_id}.json"
 
 
 def slow_queries_path(db_id: str) -> Path:
-    return data_dir() / f".backupper-slow-queries-{db_id}.jsonl"
+    return data_dir() / f".db-toolchain-slow-queries-{db_id}.jsonl"
 
 
 def collect_db_metrics(sess: Session, *, db_id: str) -> dict[str, Any]:
@@ -144,9 +144,9 @@ def _append_readiness_metrics(lines: list[str], cfg: Config) -> None:
     report = readiness(cfg)
     lines.extend(
         [
-            "# HELP backupper_ready 1 when all readiness checks pass",
-            "# TYPE backupper_ready gauge",
-            f"backupper_ready {1 if report.ok else 0}",
+            "# HELP db_toolchain_ready 1 when all readiness checks pass",
+            "# TYPE db_toolchain_ready gauge",
+            f"db_toolchain_ready {1 if report.ok else 0}",
         ]
     )
     for check in report.checks:
@@ -154,9 +154,9 @@ def _append_readiness_metrics(lines: list[str], cfg: Config) -> None:
         value = 1 if check.ok else 0
         lines.extend(
             [
-                "# HELP backupper_readiness_check Per-check readiness (1=ok)",
-                "# TYPE backupper_readiness_check gauge",
-                f'backupper_readiness_check{{check="{safe_name}"}} {value}',
+                "# HELP db_toolchain_readiness_check Per-check readiness (1=ok)",
+                "# TYPE db_toolchain_readiness_check gauge",
+                f'db_toolchain_readiness_check{{check="{safe_name}"}} {value}',
             ]
         )
 
@@ -182,40 +182,40 @@ def prometheus_text(cfg: Config) -> str:
         streak = metrics.get("backup_failure_streak", 0)
         lines.extend(
             [
-                "# HELP backupper_database_size_bytes Postgres database size",
-                "# TYPE backupper_database_size_bytes gauge",
-                f'backupper_database_size_bytes{{database="{db}"}} {size}',
-                "# HELP backupper_connections Active connections to this database",
-                "# TYPE backupper_connections gauge",
-                f'backupper_connections{{database="{db}"}} {metrics["connection_count"]}',
-                "# HELP backupper_active_queries Currently active queries",
-                "# TYPE backupper_active_queries gauge",
-                f'backupper_active_queries{{database="{db}"}} {metrics["active_queries"]}',
-                "# HELP backupper_backup_failure_streak Consecutive backup failures",
-                "# TYPE backupper_backup_failure_streak gauge",
-                f'backupper_backup_failure_streak{{database="{db}"}} {streak}',
-                "# HELP backupper_last_backup_timestamp_seconds Last successful backup unix time",
-                "# TYPE backupper_last_backup_timestamp_seconds gauge",
+                "# HELP db_toolchain_database_size_bytes Postgres database size",
+                "# TYPE db_toolchain_database_size_bytes gauge",
+                f'db_toolchain_database_size_bytes{{database="{db}"}} {size}',
+                "# HELP db_toolchain_connections Active connections to this database",
+                "# TYPE db_toolchain_connections gauge",
+                f'db_toolchain_connections{{database="{db}"}} {metrics["connection_count"]}',
+                "# HELP db_toolchain_active_queries Currently active queries",
+                "# TYPE db_toolchain_active_queries gauge",
+                f'db_toolchain_active_queries{{database="{db}"}} {metrics["active_queries"]}',
+                "# HELP db_toolchain_backup_failure_streak Consecutive backup failures",
+                "# TYPE db_toolchain_backup_failure_streak gauge",
+                f'db_toolchain_backup_failure_streak{{database="{db}"}} {streak}',
+                "# HELP db_toolchain_last_backup_timestamp_seconds Last successful backup unix time",
+                "# TYPE db_toolchain_last_backup_timestamp_seconds gauge",
             ]
         )
         backup_ts = 0.0
         if metrics.get("last_backup_at"):
             backup_ts = datetime.fromisoformat(metrics["last_backup_at"]).timestamp()
-        lines.append(f'backupper_last_backup_timestamp_seconds{{database="{db}"}} {backup_ts}')
+        lines.append(f'db_toolchain_last_backup_timestamp_seconds{{database="{db}"}} {backup_ts}')
         if status.last_failure_at:
             fail_ts = datetime.fromisoformat(status.last_failure_at).timestamp()
             lines.extend(
                 [
-                    "# HELP backupper_last_failure_timestamp_seconds Last backup failure unix time",
-                    "# TYPE backupper_last_failure_timestamp_seconds gauge",
-                    f'backupper_last_failure_timestamp_seconds{{database="{db}"}} {fail_ts}',
+                    "# HELP db_toolchain_last_failure_timestamp_seconds Last backup failure unix time",
+                    "# TYPE db_toolchain_last_failure_timestamp_seconds gauge",
+                    f'db_toolchain_last_failure_timestamp_seconds{{database="{db}"}} {fail_ts}',
                 ]
             )
         lines.extend(
             [
-                "# HELP backupper_s3_backup_error 1 when the latest failure looks S3-related",
-                "# TYPE backupper_s3_backup_error gauge",
-                f'backupper_s3_backup_error{{database="{db}"}} {_s3_error_active(status)}',
+                "# HELP db_toolchain_s3_backup_error 1 when the latest failure looks S3-related",
+                "# TYPE db_toolchain_s3_backup_error gauge",
+                f'db_toolchain_s3_backup_error{{database="{db}"}} {_s3_error_active(status)}',
             ]
         )
     return "\n".join(lines) + "\n"

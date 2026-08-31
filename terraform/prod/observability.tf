@@ -25,7 +25,7 @@ data "aws_ami" "amazon_linux" {
 resource "aws_security_group" "observability" {
   count       = var.enable_observability_host ? 1 : 0
   name        = "${var.name_prefix}-${var.environment}-observability"
-  description = "Prometheus + Grafana for idp-db-backupper"
+  description = "Prometheus + Grafana for idp-db-toolchain"
   vpc_id      = data.aws_vpc.default[0].id
 
   ingress {
@@ -52,7 +52,7 @@ resource "aws_security_group" "observability" {
   }
 
   tags = {
-    Project     = "idp-db-backupper"
+    Project     = "idp-db-toolchain"
     Environment = var.environment
   }
 }
@@ -72,8 +72,8 @@ resource "aws_instance" "observability" {
   user_data = templatefile("${path.module}/user_data.sh.tpl", {
     grafana_admin_password = random_password.grafana_admin.result
     prometheus_config = templatefile("${path.module}/../../deploy/observability/prometheus.yml.tpl", {
-      metrics_target = var.backupper_metrics_target
-      metrics_scheme = var.backupper_metrics_scheme
+      metrics_target = var.db_toolchain_metrics_target
+      metrics_scheme = var.db_toolchain_metrics_scheme
     })
     prometheus_rules    = file("${path.module}/../../deploy/observability/prometheus-rules.yml")
     grafana_datasources = file("${path.module}/../../deploy/observability/grafana-datasources.yml")
@@ -84,7 +84,7 @@ resource "aws_instance" "observability" {
 
   tags = {
     Name        = "${var.name_prefix}-${var.environment}-observability"
-    Project     = "idp-db-backupper"
+    Project     = "idp-db-toolchain"
     Environment = var.environment
   }
 }

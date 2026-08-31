@@ -14,7 +14,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
       "id": 1,
       "targets": [
-        { "expr": "backupper_database_size_bytes", "legendFormat": "database size" }
+        { "expr": "db_toolchain_database_size_bytes", "legendFormat": "database size" }
       ],
       "title": "Database size",
       "type": "timeseries"
@@ -24,8 +24,8 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
       "id": 2,
       "targets": [
-        { "expr": "backupper_connections", "legendFormat": "connections" },
-        { "expr": "backupper_active_queries", "legendFormat": "active queries" }
+        { "expr": "db_toolchain_connections", "legendFormat": "connections" },
+        { "expr": "db_toolchain_active_queries", "legendFormat": "active queries" }
       ],
       "title": "Connections",
       "type": "timeseries"
@@ -35,7 +35,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
       "id": 3,
       "targets": [
-        { "expr": "backupper_last_backup_timestamp_seconds", "legendFormat": "last backup" }
+        { "expr": "db_toolchain_last_backup_timestamp_seconds", "legendFormat": "last backup" }
       ],
       "title": "Last successful backup",
       "type": "timeseries"
@@ -45,14 +45,14 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
       "id": 4,
       "targets": [
-        { "expr": "backupper_backup_failure_streak", "legendFormat": "failure streak" }
+        { "expr": "db_toolchain_backup_failure_streak", "legendFormat": "failure streak" }
       ],
       "title": "Backup failure streak",
       "type": "timeseries"
     }
   ],
   "schemaVersion": 39,
-  "tags": ["postgres", "backups", "idp-db-backupper"],
+  "tags": ["postgres", "backups", "idp-db-toolchain"],
   "templating": {
     "list": [
       {
@@ -63,7 +63,7 @@
     ]
   },
   "time": { "from": "now-7d", "to": "now" },
-  "title": "idp-db-backupper",
-  "uid": "idp-db-backupper",
+  "title": "idp-db-toolchain",
+  "uid": "idp-db-toolchain",
   "version": 1
 }

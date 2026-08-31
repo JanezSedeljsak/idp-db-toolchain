@@ -11,7 +11,7 @@ resource "aws_s3_bucket" "backups" {
   bucket = "${var.name_prefix}-${var.environment}-backups-${random_id.bucket_suffix.hex}"
 
   tags = {
-    Project     = "idp-db-backupper"
+    Project     = "idp-db-toolchain"
     Environment = var.environment
     ManagedBy   = "terraform"
   }

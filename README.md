@@ -1,4 +1,4 @@
-# idp-db-backupper
+# idp-db-toolchain
 
 Multi-database PostgreSQL management platform: one k8s service, one S3 bucket, compressed backups for every database you register.
 
@@ -24,12 +24,12 @@ A single **IDP service** that connects to many production Postgres instances (or
 
 ## Configure databases
 
-Primary config lives in **`backupper.toml`** (schedules, databases, S3 settings, metrics). Load order:
+Primary config lives in **`db-toolchain.toml`** (schedules, databases, S3 settings, metrics). Load order:
 
-1. `backupper.toml` — from `BACKUPPER_CONFIG`, `./backupper.toml`, or the bundled default
+1. `db-toolchain.toml` — from `DB_TOOLCHAIN_CONFIG`, `./db-toolchain.toml`, or the bundled default
 2. `.env` — optional secrets and overrides (`AWS_*`, `S3_BUCKET`, `DATABASES`, …)
 
-Dev defaults are in the committed `backupper.toml`. Copy and edit for other environments, or mount a ConfigMap in k8s (`k8s/backupper-config.yaml`).
+Dev defaults are in the committed `db-toolchain.toml`. Copy and edit for other environments, or mount a ConfigMap in k8s (`k8s/db-toolchain-config.yaml`).
 
 ```toml
 app_env = "dev"
@@ -63,7 +63,7 @@ S3 key layout: `backups/{db_id}/{YYYY-MM-DD}/backup-{HHMMSS}.dump.zst`
 | Command | What |
 |---------|------|
 | `databases list` | list registered targets |
-| `databases add` | wizard: register a new database in `backupper.toml` |
+| `databases add` | wizard: register a new database in `db-toolchain.toml` |
 | `databases remove` | wizard: unregister (+ optional S3 backup prune) |
 | `backup [--db shop]` | backup one or all databases |
 | `export --db shop --to-db <url>` | pg_dump prod → restore elsewhere |
@@ -86,16 +86,16 @@ Retention runs on its **own cron** (default `0 3 1 * *` — 03:00 on the 1st of 
 | **Older than 2 months** | One backup per calendar month (prefer last week of that month) |
 | **Older than 12 months** | Deleted |
 
-`schedule` runs backup and retention independently — cron expressions live in `backupper.toml` under `[schedule]`. Manual `retention` still previews deletes and asks for confirmation (use `-y` to skip the prompt).
+`schedule` runs backup and retention independently — cron expressions live in `db-toolchain.toml` under `[schedule]`. Manual `retention` still previews deletes and asks for confirmation (use `-y` to skip the prompt).
 
 ```bash
 manage.py retention          # preview + confirm
-manage.py schedule           # uses [schedule] from backupper.toml
+manage.py schedule           # uses [schedule] from db-toolchain.toml
 ```
 
 ## Anonymization
 
-Each database can register columns in `backupper.anonymize_columns`. Postgres functions `backupper.anonymize_text()` and `backupper.anonymize_integer()` transform values; foreign keys are left alone.
+Each database can register columns in `"db-toolchain".anonymize_columns`. Postgres functions `"db-toolchain".anonymize_text()` and `"db-toolchain".anonymize_integer()` transform values; foreign keys are left alone.
 
 Default registry (dev): `users.name`, `users.email`, `orders.amount_cents`.
 
@@ -103,9 +103,9 @@ Exports with `--from-db` only anonymize columns listed in the registry for that 
 
 ## Observability
 
-- Job log: `$BACKUPPER_DATA_DIR/.backupper-jobs.jsonl`
-- Per-DB status: `.backupper-status-{db_id}.json`
-- Prometheus metrics: `backupper_*{database="shop"}` on `:8080/metrics`
+- Job log: `$DB_TOOLCHAIN_DATA_DIR/.db-toolchain-jobs.jsonl`
+- Per-DB status: `.db-toolchain-status-{db_id}.json`
+- Prometheus metrics: `db-toolchain_*{database="shop"}` on `:8080/metrics`
 
 ### Grafana (dev stack only)
 
@@ -114,10 +114,10 @@ The full `k8s/` stack includes **Prometheus** + **Grafana** (not deployed via `k
 | Service | URL | Notes |
 |---------|-----|--------|
 | Grafana | http://localhost:30300 | `admin` / `admin` — dashboard auto-provisioned |
-| Prometheus | http://localhost:30909 | scrapes `backupper:8080/metrics`; **alerts** at `/alerts` |
+| Prometheus | http://localhost:30909 | scrapes `db-toolchain:8080/metrics`; **alerts** at `/alerts` |
 | Alert rules | `k8s/prometheus-rules.yaml` | stale backup, failures, `/ready`, S3 errors |
 
-Import `k8s/grafana-dashboard.json` manually if you run backupper outside this stack.
+Import `k8s/grafana-dashboard.json` manually if you run db-toolchain outside this stack.
 
 ### Health checks
 
@@ -140,12 +140,12 @@ k8s uses `startupProbe` + `livenessProbe` → `/health`, `readinessProbe` → `/
 ## Platform deploy
 
 ```bash
-export IMAGE=ghcr.io/your-org/idp-db-backupper:abc123
+export IMAGE=ghcr.io/your-org/idp-db-toolchain:abc123
 export KUBECONFIG=~/.kube/platform
 PUBLISH_TARGET=remote ./dev.sh ci-publish-deploy
 ```
 
-Create the `backupper-secrets` Secret (database URLs via `DATABASES` JSON) and IRSA ServiceAccount — see `k8s/deploy/README.md`. Workload manifests: `k8s/deploy/`.
+Create the `db-toolchain-secrets` Secret (database URLs via `DATABASES` JSON) and IRSA ServiceAccount — see `k8s/deploy/README.md`. Workload manifests: `k8s/deploy/`.
 
 ## Dev
 
@@ -174,7 +174,7 @@ cp terraform.tfvars.example terraform.tfvars   # eks_cluster_name, admin_cidr, m
 terraform init && terraform apply
 ```
 
-Then patch `k8s/deploy/serviceaccount.yaml` with `backupper_irsa_role_arn` and deploy the workload. See [`terraform/prod/README.md`](terraform/prod/README.md).
+Then patch `k8s/deploy/serviceaccount.yaml` with `db_toolchain_irsa_role_arn` and deploy the workload. See [`terraform/prod/README.md`](terraform/prod/README.md).
 
 ## Backup format & Postgres versions
 
@@ -196,7 +196,7 @@ Plain SQL is useful as an **escape hatch** for odd upgrades, manual inspection, 
 ### Upgrade path (pg12 → pg19)
 
 1. **Logical dump/restore** (what this tool does): `pg_dump` on old → `pg_restore` / `psql` on new. Supported for many major jumps; test on a copy first.
-2. **`pg_upgrade`**: in-place cluster upgrade, faster for huge DBs, not what backupper orchestrates.
+2. **`pg_upgrade`**: in-place cluster upgrade, faster for huge DBs, not what db-toolchain orchestrates.
 
 Operational rule: run **`pg_dump` with the source major’s client**, **`pg_restore` with the target major’s client** (our Docker image should ship both or match the oldest source you still restore from).
 

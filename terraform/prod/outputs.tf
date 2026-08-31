@@ -8,9 +8,9 @@ output "s3_bucket_arn" {
   value       = aws_s3_bucket.backups.arn
 }
 
-output "backupper_irsa_role_arn" {
+output "db_toolchain_irsa_role_arn" {
   description = "IAM role ARN — set on k8s/deploy/serviceaccount.yaml (eks.amazonaws.com/role-arn)"
-  value       = aws_iam_role.backupper.arn
+  value       = aws_iam_role.db_toolchain.arn
 }
 
 output "grafana_url" {
@@ -35,10 +35,10 @@ output "prometheus_alerts_url" {
 }
 
 output "k8s_config_snippet" {
-  description = "Values to patch into k8s/deploy/backupper-config.yaml"
+  description = "Values to patch into k8s/deploy/db-toolchain-config.yaml"
   value = {
     s3_bucket = aws_s3_bucket.backups.bucket
     s3_region = var.aws_region
-    irsa_arn  = aws_iam_role.backupper.arn
+    irsa_arn  = aws_iam_role.db_toolchain.arn
   }
 }

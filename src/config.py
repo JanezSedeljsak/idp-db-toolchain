@@ -10,12 +10,12 @@ from typing import Any
 from urllib.parse import urlparse
 
 DEV_CREDENTIAL_MARKERS = {
-    "database_url": "backupper:backupper@localhost",
+    "database_url": "db-toolchain:db-toolchain@localhost",
     "aws_access_key_id": "test",
     "aws_secret_access_key": "test",
 }
 
-_BUNDLED_CONFIG = Path(__file__).resolve().parents[1] / "backupper.toml"
+_BUNDLED_CONFIG = Path(__file__).resolve().parents[1] / "db-toolchain.toml"
 
 
 @dataclass(frozen=True)
@@ -64,18 +64,18 @@ def with_database_url(cfg: Config, database_url: str) -> Config:
 
 
 def resolve_config_path() -> Path:
-    if env := os.getenv("BACKUPPER_CONFIG"):
+    if env := os.getenv("DB_TOOLCHAIN_CONFIG"):
         path = Path(env)
         if not path.is_file():
-            raise FileNotFoundError(f"BACKUPPER_CONFIG not found: {path}")
+            raise FileNotFoundError(f"DB_TOOLCHAIN_CONFIG not found: {path}")
         return path
-    local = Path.cwd() / "backupper.toml"
+    local = Path.cwd() / "db-toolchain.toml"
     if local.is_file():
         return local
     if _BUNDLED_CONFIG.is_file():
         return _BUNDLED_CONFIG
     raise FileNotFoundError(
-        "backupper.toml not found — create one in the project root or set BACKUPPER_CONFIG"
+        "db-toolchain.toml not found — create one in the project root or set DB_TOOLCHAIN_CONFIG"
     )
 
 
@@ -135,7 +135,7 @@ def load_databases_from_toml(data: dict[str, Any]) -> list[DatabaseTarget]:
         return [DatabaseTarget(id=_db_id_from_url(single), database_url=single)]
     rows = data.get("databases", [])
     if not isinstance(rows, list) or not rows:
-        raise RuntimeError("backupper.toml must define at least one [[databases]] entry")
+        raise RuntimeError("db-toolchain.toml must define at least one [[databases]] entry")
     return [
         DatabaseTarget(id=str(row["id"]), database_url=str(row["url"]))
         for row in rows
@@ -145,11 +145,11 @@ def load_databases_from_toml(data: dict[str, Any]) -> list[DatabaseTarget]:
 
 def ensure_dev_config(target_dir: Path | None = None, *, force: bool = False) -> Path:
     root = target_dir or Path.cwd()
-    path = root / "backupper.toml"
+    path = root / "db-toolchain.toml"
     if path.is_file() and not force:
         return path
     if not _BUNDLED_CONFIG.is_file():
-        raise FileNotFoundError("bundled backupper.toml missing from package")
+        raise FileNotFoundError("bundled db-toolchain.toml missing from package")
     path.write_text(_BUNDLED_CONFIG.read_text())
     return path
 
@@ -183,13 +183,13 @@ def load_config(*, require_prod_safe: bool = True) -> Config:
         max_schedule_failures=_pick_int("MAX_SCHEDULE_FAILURES", scheduler.get("max_failures"), 5),
         slow_query_ms=_pick_int("SLOW_QUERY_MS", metrics.get("slow_query_ms"), 5000),
         metrics_port=_pick_int("METRICS_PORT", metrics.get("port"), 8080),
-        anonymize_salt=_pick_str("ANONYMIZE_SALT", anonymize.get("salt"), "backupper"),
+        anonymize_salt=_pick_str("ANONYMIZE_SALT", anonymize.get("salt"), "db-toolchain"),
         backup_cron=_pick_str("BACKUP_CRON", schedule.get("backup"), "0 2 * * *"),
         retention_cron=_pick_str("RETENTION_CRON", schedule.get("retention"), "0 3 1 * *"),
         config_path=config_path,
     )
-    data_dir = _pick_str("BACKUPPER_DATA_DIR", _section(toml_data, "data").get("dir"), ".")
-    os.environ.setdefault("BACKUPPER_DATA_DIR", data_dir)
+    data_dir = _pick_str("DB_TOOLCHAIN_DATA_DIR", _section(toml_data, "data").get("dir"), ".")
+    os.environ.setdefault("DB_TOOLCHAIN_DATA_DIR", data_dir)
     if require_prod_safe:
         validate_prod_safe(cfg)
     return cfg

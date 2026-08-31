@@ -34,7 +34,7 @@ def test_readiness_all_ok(monkeypatch) -> None:
         anonymize_salt="x",
         backup_cron="0 2 * * *",
         retention_cron="0 3 1 * *",
-        config_path=Path("backupper.toml"),
+        config_path=Path("db-toolchain.toml"),
     )
     report = readiness(cfg)
     assert report.ok
@@ -69,7 +69,7 @@ def test_readiness_db_failure(monkeypatch) -> None:
         anonymize_salt="x",
         backup_cron="0 2 * * *",
         retention_cron="0 3 1 * *",
-        config_path=Path("backupper.toml"),
+        config_path=Path("db-toolchain.toml"),
     )
     report = readiness(cfg)
     assert not report.ok

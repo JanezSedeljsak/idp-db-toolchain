@@ -67,7 +67,7 @@ def test_plan_retention_weekly_and_monthly(monkeypatch) -> None:
         anonymize_salt="x",
         backup_cron="0 2 * * *",
         retention_cron="0 3 1 * *",
-        config_path=Path("backupper.toml"),
+        config_path=Path("db-toolchain.toml"),
     )
     db_cfg = cfg_for_db(cfg, "shop")
     today = date(2026, 3, 1)

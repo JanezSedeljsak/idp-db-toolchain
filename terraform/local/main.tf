@@ -28,7 +28,7 @@ resource "aws_s3_bucket" "backups" {
   bucket = var.bucket_name
 
   tags = {
-    Project     = "idp-db-backupper"
+    Project     = "idp-db-toolchain"
     Environment = "local"
     ManagedBy   = "terraform"
   }
@@ -42,18 +42,18 @@ resource "aws_s3_bucket_versioning" "backups" {
   }
 }
 
-resource "aws_iam_user" "backupper" {
-  name = "db-backupper"
+resource "aws_iam_user" "db_toolchain" {
+  name = "db-toolchain"
   path = "/"
 
   tags = {
-    Project = "db-backupper"
+    Project = "db-toolchain"
   }
 }
 
-resource "aws_iam_user_policy" "backupper_s3" {
-  name = "db-backupper-s3"
-  user = aws_iam_user.backupper.name
+resource "aws_iam_user_policy" "db_toolchain_s3" {
+  name = "db-toolchain-s3"
+  user = aws_iam_user.db_toolchain.name
 
   policy = jsonencode({
     Version = "2012-10-17"

@@ -6,7 +6,7 @@ rule_files:
   - /etc/prometheus/rules/*.yml
 
 scrape_configs:
-  - job_name: backupper
+  - job_name: db-toolchain
     metrics_path: /metrics
     scheme: ${metrics_scheme}
     static_configs:

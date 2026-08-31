@@ -8,7 +8,7 @@ __pycache__
 *.pyc
 .env
 .env.*
-.backupper-status.json
+.db-toolchain-status.json
 todo.md
 terraform
 k8s

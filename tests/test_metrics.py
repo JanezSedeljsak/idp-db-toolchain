@@ -25,7 +25,7 @@ def _cfg() -> Config:
         anonymize_salt="x",
         backup_cron="0 2 * * *",
         retention_cron="0 3 1 * *",
-        config_path=Path("backupper.toml"),
+        config_path=Path("db-toolchain.toml"),
     )
 
 
@@ -58,6 +58,6 @@ def test_prometheus_exports_readiness_metrics(monkeypatch) -> None:
         )
         body = prometheus_text(_cfg())
 
-    assert "backupper_ready 1" in body
-    assert 'backupper_readiness_check{check="s3"} 1' in body
-    assert "backupper_last_backup_timestamp_seconds" in body
+    assert "db_toolchain_ready 1" in body
+    assert 'db_toolchain_readiness_check{check="s3"} 1' in body
+    assert "db_toolchain_last_backup_timestamp_seconds" in body

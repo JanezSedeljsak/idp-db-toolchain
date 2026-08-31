@@ -1,21 +1,21 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: idp-db-backupper
+namespace: idp-db-toolchain
 
 resources:
   - ../namespace.yaml
   - serviceaccount.yaml
-  - backupper-config.yaml
-  - backupper-deployment.yaml
-  - ../backupper-service.yaml
+  - db-toolchain-config.yaml
+  - db-toolchain-deployment.yaml
+  - ../db-toolchain-service.yaml
   - ../prometheus-rules.yaml
 
 commonLabels:
-  app.kubernetes.io/part-of: idp-db-backupper
-  app.kubernetes.io/managed-by: idp-db-backupper
+  app.kubernetes.io/part-of: idp-db-toolchain
+  app.kubernetes.io/managed-by: idp-db-toolchain
 
 images:
-  - name: idp-db-backupper
-    newName: ghcr.io/your-org/idp-db-backupper
+  - name: idp-db-toolchain
+    newName: ghcr.io/your-org/idp-db-toolchain
     newTag: latest

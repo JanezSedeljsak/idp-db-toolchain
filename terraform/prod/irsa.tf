@@ -10,8 +10,8 @@ locals {
   oidc_provider_host = replace(data.aws_iam_openid_connect_provider.eks.url, "https://", "")
 }
 
-resource "aws_iam_role" "backupper" {
-  name = "${var.name_prefix}-${var.environment}-backupper"
+resource "aws_iam_role" "db_toolchain" {
+  name = "${var.name_prefix}-${var.environment}-db-toolchain"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -33,14 +33,14 @@ resource "aws_iam_role" "backupper" {
   })
 
   tags = {
-    Project     = "idp-db-backupper"
+    Project     = "idp-db-toolchain"
     Environment = var.environment
   }
 }
 
-resource "aws_iam_role_policy" "backupper_s3" {
+resource "aws_iam_role_policy" "db_toolchain_s3" {
   name = "${var.name_prefix}-${var.environment}-s3"
-  role = aws_iam_role.backupper.id
+  role = aws_iam_role.db_toolchain.id
 
   policy = jsonencode({
     Version = "2012-10-17"

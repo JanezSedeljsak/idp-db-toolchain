@@ -4,9 +4,9 @@ import os
 import subprocess
 import sys
 
-NS = "idp-db-backupper"
-IMAGE = "idp-db-backupper:local"
-KIND_CLUSTER = "idp-db-backupper"
+NS = "idp-db-toolchain"
+IMAGE = "idp-db-toolchain:local"
+KIND_CLUSTER = "idp-db-toolchain"
 
 _WAIT_TIMEOUT = "300s"
 _INFRA_SELECTORS = (

@@ -21,7 +21,7 @@ class BackupStatus:
 
 
 def status_path(db_id: str) -> Path:
-    return data_dir() / f".backupper-status-{db_id}.json"
+    return data_dir() / f".db-toolchain-status-{db_id}.json"
 
 
 def load_status(db_id: str) -> BackupStatus:

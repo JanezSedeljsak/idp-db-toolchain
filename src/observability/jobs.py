@@ -24,7 +24,7 @@ class JobRecord:
 
 
 def jobs_log_path() -> Path:
-    return data_dir() / ".backupper-jobs.jsonl"
+    return data_dir() / ".db-toolchain-jobs.jsonl"
 
 
 def append_job(record: JobRecord) -> None:

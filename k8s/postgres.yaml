@@ -65,17 +65,17 @@ spec:
               memory: 512Mi
           readinessProbe:
             exec:
-              command: [pg_isready, -U, backupper]
+              command: [pg_isready, -U, db-toolchain]
             periodSeconds: 5
             failureThreshold: 12
           startupProbe:
             exec:
-              command: [pg_isready, -U, backupper]
+              command: [pg_isready, -U, db-toolchain]
             periodSeconds: 5
             failureThreshold: 60
           livenessProbe:
             exec:
-              command: [pg_isready, -U, backupper]
+              command: [pg_isready, -U, db-toolchain]
             periodSeconds: 10
             failureThreshold: 6
           volumeMounts:

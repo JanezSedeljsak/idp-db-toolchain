@@ -15,7 +15,7 @@ terraform {
   # Uncomment for team use:
   # backend "s3" {
   #   bucket         = "your-terraform-state"
-  #   key            = "idp-db-backupper/prod/terraform.tfstate"
+  #   key            = "idp-db-toolchain/prod/terraform.tfstate"
   #   region         = "eu-central-1"
   #   dynamodb_table = "terraform-locks"
   #   encrypt        = true

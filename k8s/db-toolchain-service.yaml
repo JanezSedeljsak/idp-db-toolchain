@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: backupper
+  name: db-toolchain
 spec:
   selector:
-    app: backupper
+    app: db-toolchain
   ports:
     - name: metrics
       port: 8080

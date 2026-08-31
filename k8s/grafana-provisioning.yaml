@@ -21,15 +21,15 @@ data:
   dashboards.yaml: |
     apiVersion: 1
     providers:
-      - name: backupper
+      - name: db-toolchain
         orgId: 1
-        folder: idp-db-backupper
+        folder: idp-db-toolchain
         type: file
         disableDeletion: false
         editable: true
         options:
           path: /var/lib/grafana/dashboards
-  idp-db-backupper.json: |
+  idp-db-toolchain.json: |
     {
       "annotations": { "list": [] },
       "editable": true,
@@ -44,7 +44,7 @@ data:
           "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
           "id": 1,
           "targets": [
-            { "expr": "backupper_database_size_bytes", "legendFormat": "{{database}}" }
+            { "expr": "db_toolchain_database_size_bytes", "legendFormat": "{{database}}" }
           ],
           "title": "Database size",
           "type": "timeseries"
@@ -54,8 +54,8 @@ data:
           "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
           "id": 2,
           "targets": [
-            { "expr": "backupper_connections", "legendFormat": "{{database}} connections" },
-            { "expr": "backupper_active_queries", "legendFormat": "{{database}} active" }
+            { "expr": "db_toolchain_connections", "legendFormat": "{{database}} connections" },
+            { "expr": "db_toolchain_active_queries", "legendFormat": "{{database}} active" }
           ],
           "title": "Connections",
           "type": "timeseries"
@@ -66,7 +66,7 @@ data:
           "id": 3,
           "targets": [
             {
-              "expr": "backupper_last_backup_timestamp_seconds",
+              "expr": "db_toolchain_last_backup_timestamp_seconds",
               "legendFormat": "{{database}}"
             }
           ],
@@ -78,14 +78,14 @@ data:
           "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
           "id": 4,
           "targets": [
-            { "expr": "backupper_backup_failure_streak", "legendFormat": "{{database}}" }
+            { "expr": "db_toolchain_backup_failure_streak", "legendFormat": "{{database}}" }
           ],
           "title": "Backup failure streak",
           "type": "timeseries"
         }
       ],
       "schemaVersion": 39,
-      "tags": ["postgres", "backups", "idp-db-backupper"],
+      "tags": ["postgres", "backups", "idp-db-toolchain"],
       "templating": {
         "list": [
           {
@@ -96,7 +96,7 @@ data:
         ]
       },
       "time": { "from": "now-7d", "to": "now" },
-      "title": "idp-db-backupper",
-      "uid": "idp-db-backupper",
+      "title": "idp-db-toolchain",
+      "uid": "idp-db-toolchain",
       "version": 1
     }

@@ -10,5 +10,5 @@ output "bucket_arn" {
 
 output "iam_user" {
   description = "IAM user for backup operations"
-  value       = aws_iam_user.backupper.name
+  value       = aws_iam_user.db_toolchain.name
 }

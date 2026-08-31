@@ -2,15 +2,15 @@ app_env = "dev"
 
 [[databases]]
 id = "shop"
-url = "postgres://backupper:backupper@localhost:30433/shop?sslmode=disable"
+url = "postgres://db-toolchain:db-toolchain@localhost:30433/shop?sslmode=disable"
 
 [[databases]]
 id = "billing"
-url = "postgres://backupper:backupper@localhost:30433/billing?sslmode=disable"
+url = "postgres://db-toolchain:db-toolchain@localhost:30433/billing?sslmode=disable"
 
 [[databases]]
 id = "analytics"
-url = "postgres://backupper:backupper@localhost:30433/analytics?sslmode=disable"
+url = "postgres://db-toolchain:db-toolchain@localhost:30433/analytics?sslmode=disable"
 
 [s3]
 bucket = "db-backups"
@@ -30,7 +30,7 @@ port = 8080
 slow_query_ms = 5000
 
 [anonymize]
-salt = "backupper"
+salt = "db-toolchain"
 
 [scheduler]
 max_failures = 5

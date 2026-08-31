@@ -321,7 +321,7 @@ wheels = [
 ]
 
 [[package]]
-name = "idp-db-backupper"
+name = "idp-db-toolchain"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

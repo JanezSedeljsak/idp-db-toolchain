@@ -13,33 +13,33 @@ variable "environment" {
 variable "name_prefix" {
   description = "Prefix for AWS resource names"
   type        = string
-  default     = "idp-db-backupper"
+  default     = "idp-db-toolchain"
 }
 
 variable "eks_cluster_name" {
-  description = "Existing EKS cluster where the backupper workload runs"
+  description = "Existing EKS cluster where the idp-db-toolchain workload runs"
   type        = string
 }
 
 variable "k8s_namespace" {
-  description = "Kubernetes namespace for the backupper ServiceAccount"
+  description = "Kubernetes namespace for the db-toolchain ServiceAccount"
   type        = string
-  default     = "idp-db-backupper"
+  default     = "idp-db-toolchain"
 }
 
 variable "k8s_service_account" {
   description = "Kubernetes ServiceAccount name for IRSA"
   type        = string
-  default     = "backupper"
+  default     = "db-toolchain"
 }
 
-variable "backupper_metrics_target" {
+variable "db_toolchain_metrics_target" {
   description = "host:port scraped by Prometheus (internal LB, in-cluster IP, or VPN-reachable endpoint)"
   type        = string
 }
 
-variable "backupper_metrics_scheme" {
-  description = "http or https for backupper metrics scrape"
+variable "db_toolchain_metrics_scheme" {
+  description = "http or https for db-toolchain metrics scrape"
   type        = string
   default     = "http"
 }

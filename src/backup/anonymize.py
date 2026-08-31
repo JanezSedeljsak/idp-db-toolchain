@@ -13,11 +13,11 @@ from db import pg_tools
 from db.session import session
 from storage import s3
 
-SCRATCH_DB = "backupper_anonymize"
+SCRATCH_DB = "db_toolchain_anonymize"
 
 ANONYMIZE_COLUMNS_SQL = """
 SELECT table_schema, table_name, column_name, data_type
-FROM backupper.anonymize_columns AS ac
+FROM "db-toolchain".anonymize_columns AS ac
 JOIN information_schema.columns AS ic
   ON ic.table_schema = ac.table_schema
  AND ic.table_name = ac.table_name
@@ -34,7 +34,7 @@ def registry_available(sess: Session) -> bool:
             SELECT EXISTS (
                 SELECT 1
                 FROM information_schema.tables
-                WHERE table_schema = 'backupper'
+                WHERE table_schema = 'db-toolchain'
                   AND table_name = 'anonymize_columns'
             )
             """
@@ -51,9 +51,9 @@ def anonymize_session(sess: Session, *, salt: str) -> int:
         table_ident = f"{db.quote_ident(schema)}.{db.quote_ident(table)}"
         col_ident = db.quote_ident(column)
         if data_type in ("integer", "bigint", "smallint"):
-            expr = f"backupper.anonymize_integer({col_ident}, :salt)"
+            expr = f'"db-toolchain".anonymize_integer({col_ident}, :salt)'
         else:
-            expr = f"backupper.anonymize_text({col_ident}::text, :salt)"
+            expr = f'"db-toolchain".anonymize_text({col_ident}::text, :salt)'
         sess.execute(
             text(f"UPDATE {table_ident} SET {col_ident} = {expr} WHERE {col_ident} IS NOT NULL"),
             {"salt": salt},

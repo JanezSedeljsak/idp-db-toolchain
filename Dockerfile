@@ -14,7 +14,7 @@ COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-install-project --no-dev
 
-COPY README.md manage.py backupper.toml ./
+COPY README.md manage.py db-toolchain.toml ./
 COPY src ./src
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
@@ -30,11 +30,11 @@ RUN apt-get update \
 
 WORKDIR /app
 
-RUN useradd --create-home --uid 1000 --shell /usr/sbin/nologin backupper
+RUN useradd --create-home --uid 1000 --shell /usr/sbin/nologin db-toolchain
 
-COPY --from=builder --chown=backupper:backupper /app /app
+COPY --from=builder --chown=db-toolchain:db-toolchain /app /app
 
-USER backupper
+USER db-toolchain
 
 ENV PATH="/app/.venv/bin:$PATH"
 

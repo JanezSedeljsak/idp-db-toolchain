@@ -1,5 +1,5 @@
 [project]
-name = "idp-db-backupper"
+name = "idp-db-toolchain"
 version = "0.1.0"
 description = "PostgreSQL backup tool with zstd compression and S3 storage (LocalStack/AWS)"
 readme = "README.md"
@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-dbbackupper = "cli:app"
+dbdb-toolchain = "cli:app"
 
 [build-system]
 requires = ["hatchling"]
@@ -24,7 +24,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/backup", "src/db", "src/observability", "src/ops", "src/storage"]
-include = ["src/cli.py", "src/config.py", "src/paths.py", "src/logging_config.py", "backupper.toml"]
+include = ["src/cli.py", "src/config.py", "src/paths.py", "src/logging_config.py", "db-toolchain.toml"]
 
 [tool.hatch.build.targets.wheel.sources]
 src = ""
