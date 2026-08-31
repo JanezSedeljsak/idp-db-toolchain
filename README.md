@@ -178,6 +178,8 @@ Create the `db-toolchain-secrets` Secret (database URLs via `DATABASES` JSON) an
 
 Postgres `:30433`, LocalStack `:30456` (local kind). Three demo databases: shop, billing, analytics.
 
+Install git hooks once: `pre-commit install` (blocks `.env` / `.env.prod` commits and obvious hardcoded secrets).
+
 ## Terraform
 
 | Path | When to use |

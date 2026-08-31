@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-toolchain-config
+data:
+  db-toolchain.toml: |
+    app_env = "dev"
+
+    [[databases]]
+    id = "shop"
+    url = "postgres://db-toolchain:db-toolchain@postgres:5432/shop?sslmode=disable"
+
+    [[databases]]
+    id = "billing"
+    url = "postgres://db-toolchain:db-toolchain@postgres:5432/billing?sslmode=disable"
+
+    [[databases]]
+    id = "analytics"
+    url = "postgres://db-toolchain:db-toolchain@postgres:5432/analytics?sslmode=disable"
+
+    [s3]
+    bucket = "__S3_BUCKET__"
+    prefix = "backups"
+    region = "__AWS_REGION__"
+
+    [schedule]
+    backup = "0 2 * * *"
+    retention = "0 3 1 * *"
+
+    [backup]
+    zstd_level = 3
+
+    [metrics]
+    port = 8080
+    slow_query_ms = 5000
+
+    [anonymize]
+    salt = "db-toolchain"
+
+    [scheduler]
+    max_failures = 5
+
+    [notify]
+    webhook_url = ""
+
+    [data]
+    dir = "/var/lib/db-toolchain"

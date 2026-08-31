@@ -1,0 +1,25 @@
+{
+  "format_on_save": "on",
+  "languages": {
+    "Python": {
+      "format_on_save": "on",
+      "formatter": {
+        "external": {
+          "command": "uv",
+          "arguments": [
+            "run",
+            "ruff",
+            "format",
+            "--stdin-filename",
+            "{buffer_path}",
+            "-"
+          ]
+        }
+      },
+      "code_actions_on_format": {
+        "source.organizeImports.ruff": true,
+        "source.fixAll.ruff": true
+      }
+    }
+  }
+}

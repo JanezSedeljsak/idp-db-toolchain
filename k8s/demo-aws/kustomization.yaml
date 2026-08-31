@@ -1,0 +1,42 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: idp-db-toolchain
+
+resources:
+  - ../namespace.yaml
+  - ../postgres-secret.yaml
+  - ../postgres-init.yaml
+  - ../postgres.yaml
+  - serviceaccount.yaml
+  - db-toolchain-config.yaml
+  - ../db-toolchain-deployment.yaml
+  - ../db-toolchain-service.yaml
+  - ../prometheus-config.yaml
+  - ../prometheus-rules.yaml
+  - ../prometheus.yaml
+  - ../grafana-provisioning.yaml
+  - ../grafana.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: idp-db-toolchain
+      app.kubernetes.io/managed-by: idp-db-toolchain-demo-aws
+
+images:
+  - name: idp-db-toolchain
+    newName: __ECR_IMAGE__
+    newTag: __ECR_TAG__
+
+patches:
+  - path: patches/grafana-service.yaml
+  - path: patches/prometheus-service.yaml
+  - target:
+      kind: Deployment
+      name: db-toolchain
+    patch: |-
+      - op: add
+        path: /spec/template/spec/serviceAccountName
+        value: db-toolchain
+      - op: remove
+        path: /spec/template/spec/containers/0/envFrom
