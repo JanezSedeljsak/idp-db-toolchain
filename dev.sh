@@ -414,7 +414,7 @@ ci_test() {
 
 ci_coverage() {
   LOCKED=1 sync_deps
-  uv run pytest -q -m "not integration" --cov --cov-report=term-missing --cov-report=xml "$@"
+  uv run pytest -q -m "not integration" --cov --cov-report=term-missing "$@"
 }
 
 ci_integration() {

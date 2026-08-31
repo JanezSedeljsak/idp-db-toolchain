@@ -516,7 +516,7 @@ def jobs(
         )
 
 
-@app.command()
+@app.command("health")
 def health_cmd(
     readiness: Annotated[
         bool, typer.Option("--readiness/--liveness", help="Check dependencies or process only")
@@ -532,7 +532,7 @@ def health_cmd(
         raise typer.Exit(code=1)
 
 
-@app.command()
+@app.command("metrics")
 def metrics_cmd(
     db: Annotated[str | None, typer.Option("--db")] = None,
 ) -> None:
@@ -545,7 +545,7 @@ def metrics_cmd(
             log.info("  %s: %s", key, value)
 
 
-@app.command()
+@app.command("status")
 def status_cmd(
     db: Annotated[str | None, typer.Option("--db")] = None,
 ) -> None:

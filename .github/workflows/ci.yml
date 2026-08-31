@@ -104,10 +104,16 @@ jobs:
         with:
           python-version: "3.14"
       - run: ./dev.sh ci-coverage
-      - uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: coverage.xml
+      - name: Coverage summary
+        run: |
+          {
+            echo "## Coverage"
+            echo
+            total="$(uv run coverage report | awk '/^TOTAL/ { print $NF }')"
+            echo "**Total coverage: ${total}**"
+            echo
+            uv run coverage report --format=markdown
+          } >> "$GITHUB_STEP_SUMMARY"
 
   integration:
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
