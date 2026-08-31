@@ -194,7 +194,7 @@ def prometheus_text(cfg: Config) -> str:
                 "# HELP db_toolchain_backup_failure_streak Consecutive backup failures",
                 "# TYPE db_toolchain_backup_failure_streak gauge",
                 f'db_toolchain_backup_failure_streak{{database="{db}"}} {streak}',
-                "# HELP db_toolchain_last_backup_timestamp_seconds Last successful backup unix time",
+                "# HELP db_toolchain_last_backup_timestamp_seconds Last successful backup time",
                 "# TYPE db_toolchain_last_backup_timestamp_seconds gauge",
             ]
         )
@@ -206,7 +206,7 @@ def prometheus_text(cfg: Config) -> str:
             fail_ts = datetime.fromisoformat(status.last_failure_at).timestamp()
             lines.extend(
                 [
-                    "# HELP db_toolchain_last_failure_timestamp_seconds Last backup failure unix time",
+                    "# HELP db_toolchain_last_failure_timestamp_seconds Last backup failure time",
                     "# TYPE db_toolchain_last_failure_timestamp_seconds gauge",
                     f'db_toolchain_last_failure_timestamp_seconds{{database="{db}"}} {fail_ts}',
                 ]
