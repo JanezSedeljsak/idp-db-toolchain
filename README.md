@@ -1,11 +1,30 @@
 # idp-db-toolchain
 
-Multi-database PostgreSQL management platform: one k8s service, one S3 bucket, compressed backups for every database you register.
+**Internal IDP demo** — a reference stack for Kubernetes cluster tasks around **database management, backups, and metrics**. One service registers many Postgres databases, runs scheduled backups to S3, exposes Prometheus metrics, and ships with Grafana dashboards and alert rules.
+
+Built with **Terraform** (AWS: EKS, S3, IRSA, ECR), **Kubernetes** (Kustomize), **Python** (`uv`, Typer), **GitHub Actions**, **kind**, **LocalStack**, **Prometheus**, and **Grafana**. Local dev uses kind; the AWS demo provisions a throwaway EKS cluster via `./dev.sh wizard-aws`.
 
 ```bash
-./dev.sh wizard
+./dev.sh wizard       # local
+./dev.sh wizard-aws   # AWS demo
 ./dev.sh test
 ```
+
+## CI/CD
+
+GitHub Actions (`.github/workflows/ci.yml`) on every push/PR to `main` (docs-only changes are skipped):
+
+| Stage | What |
+|-------|------|
+| **lint** | `ruff` check + format, via `./dev.sh ci-lint` |
+| **build** | `uv build`, Docker image → GHCR on `main`; artifact for downstream jobs |
+| **scan** | Trivy image scan (HIGH/CRITICAL) |
+| **test** | `mypy` + unit tests |
+| **coverage** | pytest coverage + summary table in the job summary |
+| **integration** | kind cluster, full stack, integration tests + smoke (`daily` / `list` / `status`) |
+| **publish** | manual `workflow_dispatch` only — rolling deploy to platform EKS via `kubectl` |
+
+Concurrency is cancelled per branch. Production deploy does not run migrations or seeds — image rollout only.
 
 ## What this is
 
@@ -150,18 +169,21 @@ Create the `db-toolchain-secrets` Secret (database URLs via `DATABASES` JSON) an
 ## Dev
 
 ```bash
-./dev.sh wizard
+./dev.sh wizard          # local kind + LocalStack + 3 demo DBs
+./dev.sh wizard-aws      # ephemeral EKS demo (see terraform/demo/)
+./dev.sh aws-down        # destroy AWS demo
 ./dev.sh test
 ./dev.sh test-integration
 ```
 
-Postgres `:30433`, LocalStack `:30456`. Three demo databases seeded via wizard.
+Postgres `:30433`, LocalStack `:30456` (local kind). Three demo databases: shop, billing, analytics.
 
 ## Terraform
 
 | Path | When to use |
 |------|-------------|
 | `terraform/local/` | Optional LocalStack S3/IAM bootstrap — **not required** for `./dev.sh wizard` |
+| `terraform/demo/` | **Ephemeral AWS demo** — EKS + S3 + ECR + in-cluster Postgres / Prom / Grafana (`./dev.sh wizard-aws`) |
 | `terraform/prod/` | **Production AWS** — S3 bucket, EKS IRSA, Prometheus + Grafana on EC2 |
 
 Production:

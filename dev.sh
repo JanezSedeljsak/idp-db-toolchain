@@ -8,6 +8,9 @@ IMAGE="${IMAGE:-idp-db-toolchain:local}"
 KIND_CLUSTER="${KIND_CLUSTER:-idp-db-toolchain}"
 DEPLOY_NAMESPACE="${DEPLOY_NAMESPACE:-idp-db-toolchain}"
 DEPLOY_KUSTOMIZE="${DEPLOY_KUSTOMIZE:-k8s/deploy}"
+AWS_DEMO_TF_DIR="${AWS_DEMO_TF_DIR:-terraform/demo}"
+AWS_DEMO_KUSTOMIZE_SRC="${AWS_DEMO_KUSTOMIZE_SRC:-k8s/demo-aws}"
+AWS_DEMO_BUILD_DIR="${AWS_DEMO_BUILD_DIR:-.aws-demo-build}"
 
 usage() {
   cat <<EOF
@@ -36,6 +39,8 @@ commands:
   ci-test            CI unit test job
   ci-coverage        CI coverage job (unit tests + coverage report)
   ci-integration     CI integration job (needs kind + docker image)
+  wizard-aws         guided AWS demo (EKS + S3 + in-cluster stack)
+  aws-down           destroy AWS demo infrastructure
 EOF
 }
 
@@ -355,6 +360,171 @@ Useful commands:
 EOF
 }
 
+sed_inplace() {
+  local pattern=$1
+  local file=$2
+  if [[ "$(uname -s)" == Darwin ]]; then
+    sed -i '' "$pattern" "$file"
+  else
+    sed -i "$pattern" "$file"
+  fi
+}
+
+aws_demo_tf() {
+  terraform -chdir="$AWS_DEMO_TF_DIR" "$@"
+}
+
+aws_demo_render_kustomize() {
+  local bucket=$1 irsa_arn=$2 ecr_image=$3 ecr_tag=$4 aws_region=$5
+
+  rm -rf "$AWS_DEMO_BUILD_DIR"
+  cp -r "$AWS_DEMO_KUSTOMIZE_SRC" "$AWS_DEMO_BUILD_DIR"
+
+  sed_inplace "s|__IRSA_ROLE_ARN__|${irsa_arn}|g" "$AWS_DEMO_BUILD_DIR/serviceaccount.yaml"
+  sed_inplace "s|__S3_BUCKET__|${bucket}|g" "$AWS_DEMO_BUILD_DIR/db-toolchain-config.yaml"
+  sed_inplace "s|__AWS_REGION__|${aws_region}|g" "$AWS_DEMO_BUILD_DIR/db-toolchain-config.yaml"
+  sed_inplace "s|__ECR_IMAGE__|${ecr_image}|g" "$AWS_DEMO_BUILD_DIR/kustomization.yaml"
+  sed_inplace "s|__ECR_TAG__|${ecr_tag}|g" "$AWS_DEMO_BUILD_DIR/kustomization.yaml"
+}
+
+aws_demo_push_image() {
+  local ecr_url=$1 tag=$2 aws_region=$3
+  local registry host
+
+  registry="${ecr_url%%/*}"
+  host="${registry#https://}"
+
+  aws ecr get-login-password --region "$aws_region" \
+    | docker login --username AWS --password-stdin "$host"
+
+  docker_build
+  docker tag "$IMAGE" "${ecr_url}:${tag}"
+  docker push "${ecr_url}:${tag}"
+}
+
+aws_demo_deploy_workloads() {
+  local bucket irsa_arn ecr_url aws_region tag
+
+  bucket="$(aws_demo_tf output -raw s3_bucket)"
+  irsa_arn="$(aws_demo_tf output -raw irsa_role_arn)"
+  ecr_url="$(aws_demo_tf output -raw ecr_repository_url)"
+  aws_region="$(aws_demo_tf output -raw aws_region)"
+  tag="${AWS_DEMO_IMAGE_TAG:-demo}"
+
+  aws_demo_render_kustomize "$bucket" "$irsa_arn" "$ecr_url" "$tag" "$aws_region"
+  aws_demo_push_image "$ecr_url" "$tag" "$aws_region"
+
+  kubectl apply -k "$AWS_DEMO_BUILD_DIR"
+  wait_k8s_ready
+  wait_db_toolchain_ready
+  kubectl exec -n "$DEPLOY_NAMESPACE" deployment/db-toolchain -- python manage.py seed
+}
+
+aws_demo_smoke() {
+  kubectl exec -n "$DEPLOY_NAMESPACE" deployment/db-toolchain -- python manage.py daily
+  kubectl exec -n "$DEPLOY_NAMESPACE" deployment/db-toolchain -- python manage.py list
+  kubectl exec -n "$DEPLOY_NAMESPACE" deployment/db-toolchain -- python manage.py status
+}
+
+aws_down() {
+  if ! confirm "Delete AWS demo cluster and all terraform/demo resources?"; then
+    echo "cancelled"
+    exit 0
+  fi
+
+  if have kubectl && [[ -d "$AWS_DEMO_BUILD_DIR" ]]; then
+    kubectl delete -k "$AWS_DEMO_BUILD_DIR" --ignore-not-found --wait=false 2>/dev/null || true
+  fi
+
+  aws_demo_tf destroy -auto-approve
+  rm -rf "$AWS_DEMO_BUILD_DIR"
+  echo "AWS demo destroyed"
+}
+
+wizard_aws() {
+  local total=8 missing=0 tfvars
+
+  step "1/$total Check prerequisites"
+  for cmd in aws terraform kubectl docker; do
+    if have "$cmd"; then
+      echo "  ok $cmd"
+    else
+      echo "  missing $cmd"
+      missing=1
+    fi
+  done
+  if (( missing )); then
+    echo "Install the missing tools above, then run ./dev.sh wizard-aws again."
+    exit 1
+  fi
+
+  step "2/$total AWS credentials"
+  if ! aws sts get-caller-identity >/dev/null 2>&1; then
+    echo "AWS credentials not configured — run: aws configure (or aws sso login)" >&2
+    exit 1
+  fi
+  aws sts get-caller-identity
+
+  tfvars="$ROOT/$AWS_DEMO_TF_DIR/terraform.tfvars"
+  if [[ ! -f "$tfvars" ]]; then
+    cp "$ROOT/$AWS_DEMO_TF_DIR/terraform.tfvars.example" "$tfvars"
+    echo "  created $tfvars — set budget_email before continuing"
+    exit 1
+  fi
+  if grep -q 'you@example.com' "$tfvars"; then
+    echo "  edit budget_email in $tfvars (required for €20 budget alerts)" >&2
+    exit 1
+  fi
+
+  step "3/$total Terraform (EKS + S3 + ECR + IRSA)"
+  echo "  Estimated demo cost: ~€7–15 for a few days (budget alert at €20)."
+  if ! confirm "Apply terraform/demo?"; then
+    echo "  skipped"
+    exit 0
+  fi
+  aws_demo_tf init -input=false
+  aws_demo_tf apply -auto-approve
+
+  step "4/$total kubeconfig"
+  eval "$(aws_demo_tf output -raw kubeconfig_command)"
+
+  step "5/$total Build, push, deploy workloads"
+  LOCKED=1 sync_deps
+  aws_demo_deploy_workloads
+
+  step "6/$total Smoke test"
+  if confirm "Run daily backup for shop, billing, analytics?"; then
+    aws_demo_smoke
+  else
+    echo "  skipped"
+  fi
+
+  step "7/$total Observability"
+  cat <<EOF
+
+Grafana and Prometheus run in the cluster (same as local kind stack).
+
+  kubectl port-forward -n idp-db-toolchain svc/grafana 3000:3000
+  kubectl port-forward -n idp-db-toolchain svc/prometheus 9090:9090
+
+  Grafana:    http://localhost:3000  (admin / admin)
+  Prometheus: http://localhost:9090
+
+EOF
+
+  step "8/$total Done"
+  cat <<EOF
+
+Teardown (required when finished — budget alerts do not auto-destroy):
+
+  ./dev.sh aws-down
+
+S3 bucket: $(aws_demo_tf output -raw s3_bucket)
+Cluster:   $(aws_demo_tf output -raw cluster_name)
+
+EOF
+}
+
 run_lint() {
   uv run ruff check .
   uv run ruff format --check .
@@ -437,6 +607,12 @@ shift || true
 case "$cmd" in
   wizard)
     wizard "$@"
+    ;;
+  wizard-aws)
+    wizard_aws "$@"
+    ;;
+  aws-down)
+    aws_down "$@"
     ;;
   dev)
     sync_deps "$@"

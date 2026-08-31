@@ -8,6 +8,7 @@ __pycache__/
 bin/
 .k8s/
 .terraform/
+.aws-demo-build/
 *.tfstate
 *.tfstate.*
 .terraform.lock.hcl
