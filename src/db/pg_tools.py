@@ -17,7 +17,7 @@ from db.session import get_engine
 def _require_pg_bin(name: str) -> str:
     path = shutil.which(name)
     if not path:
-        raise RuntimeError(f"{name} not found — install postgresql-client")
+        raise RuntimeError(f"{name} not found - install postgresql-client")
     return path
 
 

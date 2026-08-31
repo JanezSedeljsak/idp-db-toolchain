@@ -75,7 +75,7 @@ def resolve_config_path() -> Path:
     if _BUNDLED_CONFIG.is_file():
         return _BUNDLED_CONFIG
     raise FileNotFoundError(
-        "db-toolchain.toml not found — create one in the project root or set DB_TOOLCHAIN_CONFIG"
+        "db-toolchain.toml not found - create one in the project root or set DB_TOOLCHAIN_CONFIG"
     )
 
 

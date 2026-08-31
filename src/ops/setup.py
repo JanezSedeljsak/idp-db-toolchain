@@ -32,7 +32,7 @@ def run(
 
     config_path = Path.cwd() / "db-toolchain.toml"
     if config_path.exists() and not force:
-        raise RuntimeError(f"{config_path} exists — use --force to re-copy defaults")
+        raise RuntimeError(f"{config_path} exists - use --force to re-copy defaults")
 
     if config_path.exists() and force:
         backup_path = config_path.with_suffix(".toml.bak")
@@ -57,7 +57,7 @@ def run(
             do_seed = input("Seed sample data? (y/N): ").strip().lower() in ("y", "yes")
 
     if skip_k8s:
-        print("skipped k8s — run: uv run python manage.py k8s-up")
+        print("skipped k8s - run: uv run python manage.py k8s-up")
         return
 
     print("starting k8s...")

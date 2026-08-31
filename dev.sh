@@ -198,7 +198,7 @@ rollout_deploy() {
   kubectl set image "deployment/db-toolchain" "db-toolchain=${IMAGE}" -n "$DEPLOY_NAMESPACE"
 
   if ! kubectl rollout status "deployment/db-toolchain" -n "$DEPLOY_NAMESPACE" --timeout=300s; then
-    echo "rollout of ${IMAGE} failed to become ready — rolling back" >&2
+    echo "rollout of ${IMAGE} failed to become ready - rolling back" >&2
     kubectl rollout undo "deployment/db-toolchain" -n "$DEPLOY_NAMESPACE"
     kubectl rollout status "deployment/db-toolchain" -n "$DEPLOY_NAMESPACE" --timeout=180s
     echo "rolled back deployment/db-toolchain in ${DEPLOY_NAMESPACE} to the previous revision" >&2
@@ -213,7 +213,7 @@ rollout_deploy() {
 
 deploy_remote() {
   if [[ -z "${IMAGE:-}" ]]; then
-    echo "IMAGE is required — use the registry ref built by CI (e.g. ghcr.io/org/idp-db-toolchain:abc123)" >&2
+    echo "IMAGE is required - use the registry ref built by CI (e.g. ghcr.io/org/idp-db-toolchain:abc123)" >&2
     exit 1
   fi
 
@@ -234,7 +234,7 @@ deploy_local() {
   export IMAGE
 
   if ! kind_cluster_exists; then
-    echo "kind cluster '$KIND_CLUSTER' not found — run ./dev.sh wizard first" >&2
+    echo "kind cluster '$KIND_CLUSTER' not found - run ./dev.sh wizard first" >&2
     exit 1
   fi
 
@@ -302,7 +302,7 @@ wizard() {
   elif confirm "Create kind cluster '$KIND_CLUSTER'?"; then
     kind create cluster --name "$KIND_CLUSTER" --config k8s/kind-config.yaml
   else
-    echo "  skipped — you'll need a cluster before k8s workloads can start"
+    echo "  skipped - you'll need a cluster before k8s workloads can start"
   fi
 
   step "4/$total Configure .env and start workloads"
@@ -332,7 +332,7 @@ wizard() {
     docker_build
     kind load docker-image "$IMAGE" --name "$KIND_CLUSTER"
   else
-    echo "  skipped — run ./dev.sh docker later if you need the workload image"
+    echo "  skipped - run ./dev.sh docker later if you need the workload image"
   fi
 
   step "6/$total Smoke test"
@@ -460,7 +460,7 @@ wizard_aws() {
 
   step "2/$total AWS credentials"
   if ! aws sts get-caller-identity >/dev/null 2>&1; then
-    echo "AWS credentials not configured — run: aws configure (or aws sso login)" >&2
+    echo "AWS credentials not configured - run: aws configure (or aws sso login)" >&2
     exit 1
   fi
   aws sts get-caller-identity
@@ -468,7 +468,7 @@ wizard_aws() {
   tfvars="$ROOT/$AWS_DEMO_TF_DIR/terraform.tfvars"
   if [[ ! -f "$tfvars" ]]; then
     cp "$ROOT/$AWS_DEMO_TF_DIR/terraform.tfvars.example" "$tfvars"
-    echo "  created $tfvars — set budget_email before continuing"
+    echo "  created $tfvars - set budget_email before continuing"
     exit 1
   fi
   if grep -q 'you@example.com' "$tfvars"; then
@@ -477,7 +477,7 @@ wizard_aws() {
   fi
 
   step "3/$total Terraform (EKS + S3 + ECR + IRSA)"
-  echo "  Estimated demo cost: ~€7–15 for a few days (budget alert at €20)."
+  echo "  Estimated demo cost: ~€7-15 for a few days (budget alert at €20)."
   if ! confirm "Apply terraform/demo?"; then
     echo "  skipped"
     exit 0
@@ -515,7 +515,7 @@ EOF
   step "8/$total Done"
   cat <<EOF
 
-Teardown (required when finished — budget alerts do not auto-destroy):
+Teardown (required when finished - budget alerts do not auto-destroy):
 
   ./dev.sh aws-down
 

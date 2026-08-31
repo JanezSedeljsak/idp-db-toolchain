@@ -1,7 +1,7 @@
 [project]
 name = "idp-db-toolchain"
 version = "0.1.0"
-description = "PostgreSQL backup tool with zstd compression and S3 storage (LocalStack/AWS)"
+description = "Internal IDP demo: Postgres backups, retention, and metrics on Kubernetes"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-dbdb-toolchain = "cli:app"
+dbtoolchain = "cli:app"
 
 [build-system]
 requires = ["hatchling"]

@@ -28,7 +28,7 @@ groups:
           severity: critical
         annotations:
           summary: db-toolchain cannot reach S3
-          description: S3 API check failed — verify IAM/IRSA, bucket policy, and network egress.
+          description: S3 API check failed - verify IAM/IRSA, bucket policy, and network egress.
 
       - alert: BackupperBackupStale
         expr: |

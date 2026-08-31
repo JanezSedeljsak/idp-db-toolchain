@@ -140,7 +140,7 @@ def databases_remove(
     cfg = load_config()
     if not db_id:
         if len(cfg.databases) == 1:
-            raise typer.BadParameter("only one database registered — pass --id explicitly")
+            raise typer.BadParameter("only one database registered - pass --id explicitly")
         log.info("registered databases:")
         for target in cfg.databases:
             log.info("  %s", target.id)
@@ -415,7 +415,7 @@ _shutdown = threading.Event()
 
 def _handle_shutdown_signal(signum: int, _frame: object) -> None:
     log.info(
-        "received signal %s — finishing any in-flight job, then stopping scheduler",
+        "received signal %s - finishing any in-flight job, then stopping scheduler",
         signal.Signals(signum).name,
     )
     _shutdown.set()

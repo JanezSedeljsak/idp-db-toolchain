@@ -9,7 +9,7 @@ output "s3_bucket_arn" {
 }
 
 output "db_toolchain_irsa_role_arn" {
-  description = "IAM role ARN — set on k8s/deploy/serviceaccount.yaml (eks.amazonaws.com/role-arn)"
+  description = "IAM role ARN - set on k8s/deploy/serviceaccount.yaml (eks.amazonaws.com/role-arn)"
   value       = aws_iam_role.db_toolchain.arn
 }
 

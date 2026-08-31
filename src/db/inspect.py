@@ -1,6 +1,6 @@
 """Read-only Postgres introspection used to verify backup/restore correctness in tests.
 
-Actual backup/restore uses pg_dump/pg_restore (see db.pg_tools) — nothing
+Actual backup/restore uses pg_dump/pg_restore (see db.pg_tools) - nothing
 here writes data outside of table comparisons.
 """
 

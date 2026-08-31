@@ -1,13 +1,7 @@
-# LocalStack Terraform (optional)
+# LocalStack (optional)
 
-Bootstraps the **local dev** S3 bucket and IAM user against LocalStack.
-
-Requires LocalStack running (`./dev.sh setup` or kind stack). Not used for production.
+S3 + IAM user against LocalStack. `./dev.sh wizard` already creates the bucket; this module documents the IAM policy shape.
 
 ```bash
-cd terraform/local
-terraform init
-terraform apply
+cd terraform/local && terraform init && terraform apply
 ```
-
-`manage.py setup` also calls `ensure_bucket` — this is optional documentation of the IAM policy shape.
