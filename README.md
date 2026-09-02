@@ -70,7 +70,7 @@ On push/PR to `main` (skips docs-only): **lint** → **build** (+ GHCR on main) 
 
 **Local:** `./dev.sh wizard` (Postgres `:30433`, LocalStack `:30456`, DBs: shop, billing, analytics).
 
-**Platform:** `terraform/prod` then `k8s/deploy/`. Rolling image:
+**Platform:** provision S3 + IRSA for your EKS cluster, then apply `k8s/deploy/`. Rolling image:
 
 ```bash
 export IMAGE=ghcr.io/your-org/idp-db-toolchain:<tag>
@@ -82,7 +82,6 @@ PUBLISH_TARGET=remote ./dev.sh ci-publish-deploy
 | Terraform | Use |
 |-----------|-----|
 | `demo/` | Ephemeral EKS + in-cluster stack |
-| `prod/` | S3, IRSA, optional observability EC2 |
 | `local/` | Optional LocalStack bootstrap |
 
 Backups: `pg_dump -Fc` + zstd; restore with `pg_restore` (use target-major client for upgrades).
